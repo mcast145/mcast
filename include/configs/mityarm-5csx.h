@@ -273,6 +273,8 @@
 /*
  * Hardware drivers
  */
+#define CONFIG_SOCFPGA_GPIO		1
+#define CONFIG_CMD_GPIO			1
 
 /*
  * SDRAM Memory Map
