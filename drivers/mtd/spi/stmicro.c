@@ -324,6 +324,9 @@ struct spi_flash *spi_flash_probe_stmicro(struct spi_slave *spi, u8 * idcode)
 		return NULL;
 	}
 
+	/* init structure */
+	memset(flash, 0, sizeof(*flash));
+
 	flash->spi = spi;
 	flash->name = params->name;
 
