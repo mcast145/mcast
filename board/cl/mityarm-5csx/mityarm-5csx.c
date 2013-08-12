@@ -35,6 +35,10 @@
 #include <altera.h>
 #include <fpga.h>
 
+#include "config_block.h"
+
+#define I2C_EEPROM_BUS 0
+#define I2C_EEPROM_ADDR 0x50
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -96,6 +100,55 @@ int checkboard(void)
 	puts("BOARD : Critical Link MityARM-5CSX Module\n");
 	return 0;
 }
+#ifndef NUM_EEPROM_RETRIES
+#define NUM_EEPROM_RETRIES	2
+#endif
+
+/*
+ * Read header information from EEPROM into global structure.
+ */
+int read_eeprom(void)
+{
+
+	int retries, rv = 0;
+
+	for(retries = 0; retries <= NUM_EEPROM_RETRIES; ++retries)
+	{
+		if(retries) {
+			printf("Retrying [%d] ...\n", retries);
+		}
+
+		/* Check if baseboard eeprom is available */
+#ifdef CONFIG_I2C_MULTI_BUS
+		i2c_set_bus_num(I2C_EEPROM_BUS);
+#endif
+		if (rv) {
+			printf("Could not probe the EEPROM; something fundamentally "
+				"wrong on the I2C bus.\n");
+			continue; /* retry */
+		}
+
+		/* try and read our configuration block */
+		rv = get_factory_config_block();
+		if (rv < 0) {
+			printf("I2C Error reading factory config block\n");
+			continue; /* retry */
+		}
+		/* No I2C issues, data was either OK or not entered... */
+		if (rv > 0)
+			printf("Bad I2C configuration found\n");
+		break;
+	}
+	factory_config_block.ModelNumber[31] = '\0';
+
+#if defined(CONFIG_SPL_BUILD)
+	if (!rv)
+		printf("%s - Model  No: %32s Serial No: %d\n", PRODUCT_NAME, 
+			factory_config_block.ModelNumber, factory_config_block.SerialNumber);
+#endif
+
+	return rv;
+}
 
 /*
  * Initialization function which happen at early stage of c code
@@ -114,9 +167,14 @@ int board_early_init_f(void)
  */
 int board_init(void)
 {
+	int rv = 0;
 	/* adress of boot parameters (ATAG or FDT blob) */
 	gd->bd->bi_boot_params = 0x00000100;
-	return 0;
+	rv = read_eeprom();
+	if ( 0 != rv) {
+		memset(&factory_config_block, '\0', sizeof(factory_config_block));
+	}
+	return rv;
 }
 
 int misc_init_r(void)

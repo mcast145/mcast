@@ -71,6 +71,9 @@
  */
 #define CONFIG_DISPLAY_CPUINFO
 #define CONFIG_DISPLAY_BOARDINFO
+#define COMPANY_NAME "Critical Link"
+#define PRODUCT_NAME "MityARM-5CSX"
+#define CONFIG_IDENT_STRING " " COMPANY_NAME " " PRODUCT_NAME
 
 /*
  * Enable early stage initialization at C environment
@@ -260,7 +263,7 @@
 /* Console I/O Buffer Size */
 #define CONFIG_SYS_CBSIZE		256
 /* Monitor Command Prompt */
-#define CONFIG_SYS_PROMPT		"MityARM-5CSX # "
+#define CONFIG_SYS_PROMPT		PRODUCT_NAME " # "
 /* Print Buffer Size */
 #define CONFIG_SYS_PBSIZE		(CONFIG_SYS_CBSIZE + \
 					sizeof(CONFIG_SYS_PROMPT) + 16)

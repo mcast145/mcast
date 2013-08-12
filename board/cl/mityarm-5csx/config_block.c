@@ -31,6 +31,8 @@ int put_factory_config_block(void)
 	unsigned char* tmp;
 	unsigned int addr = 0x00;
 
+	factory_config_block.ConfigMagicWord = CONFIG_I2C_MAGIC_WORD;
+	factory_config_block.ConfigVersion = CONFIG_I2C_VERSION;
 	tmp = (unsigned char*)&factory_config_block;
 
 	for (i = 0; i < sizeof(factory_config_block); i++)
@@ -181,7 +183,7 @@ static int do_factoryconfig (cmd_tbl_t * cmdtp, int flag, int argc, char *argv[]
 
 			printf("Serial Number  : %d\n",
 				factory_config_block.SerialNumber);
-			printf("Model Number    : %s\n",
+			printf("Model Number   : %s\n",
 				factory_config_block.ModelNumber);
 	} else {
 		unsigned int i;
@@ -193,14 +195,14 @@ static int do_factoryconfig (cmd_tbl_t * cmdtp, int flag, int argc, char *argv[]
                                         factory_config_block.MACADDR[3],
                                         factory_config_block.MACADDR[4],
                                         factory_config_block.MACADDR[5]);
-                        readline_into_buffer ("MAC Address  : ", buffer, 0);
+                        readline_into_buffer ("MAC Address   : ", buffer, 0);
 			set_mac_from_string(buffer);
 			sprintf(buffer, "%d", factory_config_block.SerialNumber);
 			readline_into_buffer ("Serial Number :", buffer, 0);
 			i = atoi(buffer);
 			if (i > 0) factory_config_block.SerialNumber = i;
 			sprintf(buffer, "%s", factory_config_block.ModelNumber);
-			readline_into_buffer ("Model Number   :", buffer, 0);
+			readline_into_buffer ("Model Number  :", buffer, 0);
 			memcpy(factory_config_block.ModelNumber, buffer,
 				sizeof(factory_config_block.ModelNumber));
 			factory_config_block.ModelNumber
