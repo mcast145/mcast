@@ -207,11 +207,11 @@ static int do_factoryconfig (cmd_tbl_t * cmdtp, int flag, int argc, char *argv[]
 				sizeof(factory_config_block.ModelNumber));
 			factory_config_block.ModelNumber
 				[sizeof(factory_config_block.ModelNumber)-1] = 0;
-		} else if (0 == strncmp(argv[1],"fix",3)) {
+		} else if (0 == strncmp(argv[1],"fix",3) && argv[2]) {
 			/* Fix is so you can spec the whole config in a line */
 			char *s;
 			char *v, *k;
-			strcopy = strdup(buffer);
+			strcopy = strdup(argv[2]);
 			if (strcopy == NULL) {
 				printf("error %d in strdup\n", errno);
 				goto done;
