@@ -174,13 +174,24 @@ int board_init(void)
 	if ( 0 != rv) {
 		memset(&factory_config_block, '\0', sizeof(factory_config_block));
 	}
+
 	return rv;
 }
 
 int misc_init_r(void)
 {
+	uint8_t eth_addr[10];
 	/* add device descriptor to FPGA device table */
 	socfpga_fpga_add();
+        memcpy(eth_addr,factory_config_block.MACADDR, 6);
+
+        if(is_valid_ether_addr(eth_addr)) {
+		char tmp[24];
+                sprintf((char *)tmp, "%02x:%02x:%02x:%02x:%02x:%02x", eth_addr[0],
+                        eth_addr[1], eth_addr[2], eth_addr[3], eth_addr[4], eth_addr[5]);
+
+                setenv("ethaddr", (char *)tmp);
+        }
 	return 0;
 }
 
