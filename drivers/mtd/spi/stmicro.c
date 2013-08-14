@@ -46,16 +46,32 @@
 /* Write volatile configuration register */
 #define CMD_N25QXX_WVCR		0x81
 
+/* Read Enhanced volatile config register */
+#define CMD_N25QXX_REVCR	0x65
+
+/* write enhanced volatile config register */
+#define CMD_N25QXX_WEVCR	0x61
+
 /* Enter 4-byte address mode */
 #define CMD_N25QXX_EN4B		0xB7
 
 /* Exit 4-byte address mode */
 #define CMD_N25QXX_EX4B		0xE9
 
+/* Volatile Config Register Masks */
 #define VCR_XIP_SHIFT			(0x03)
 #define VCR_XIP_MASK			(0x08)
 #define VCR_DUMMY_CLK_CYCLES_SHIFT	(0x04)
 #define VCR_DUMMY_CLK_CYCLES_MASK	(0xF0)
+
+/* Enhanced Volatile Config Register Masks */
+#define EVCR_ODS_MASK			(0x07)
+#define EVCR_ODS_90_OHMS		(0x01)
+#define EVCR_ODS_60_OHMS		(0x02)
+#define EVCR_ODS_45_OHMS		(0x03)
+#define EVCR_ODS_20_OHMS		(0x05)
+#define EVCR_ODS_15_OHMS		(0x06)
+#define EVCR_ODS_30_OHMS		(0x07)
 
 struct stmicro_spi_flash_params {
 	u16 id;
@@ -223,6 +239,42 @@ static int stmicro_set_vcr(struct spi_flash *flash, u8 clk_cycles, u8 xip)
 		sizeof(resp));
 	if (ret) {
 		debug("SF: fail to write vcr register\n");
+		return ret;
+	}
+
+	return 0;
+}
+
+/* configure output drive strength */
+static int stmicro_set_ods(struct spi_flash *flash, u8 drive_mask)
+{
+	u8 cmd;
+	u8 resp;
+	int ret;
+
+	ret = spi_flash_cmd_write_enable(flash);
+	if (ret < 0) {
+		debug("SF: enabling write failed\n");
+		return ret;
+	}
+
+	ret = spi_flash_cmd(flash->spi, CMD_N25QXX_REVCR, (void *) &resp,
+		sizeof(resp));
+	if (ret < 0) {
+		debug("SF: read extended volatile config register failed.\n");
+		return ret;
+	}
+
+	resp &= ~EVCR_ODS_MASK;
+	resp |= drive_mask;
+
+	debug("SF: setting evcr to %X\n", resp);
+
+	cmd = CMD_N25QXX_WEVCR;
+	ret = spi_flash_cmd_write(flash->spi, &cmd, sizeof(cmd), &resp,
+		sizeof(resp));
+	if (ret) {
+		debug("SF: fail to write evcr register\n");
 		return ret;
 	}
 
