@@ -195,7 +195,7 @@
 	"mmcloadpart=1\0" \
 	"mmcroot=/dev/mmcblk0p2\0" \
 	"qspiloadcs=0\0" \
-	"qspibootimageaddr=0xa0000\0" \
+	"qspibootimageaddr=0xe0000\0" \
 	"qspifdtaddr=0x50000\0" \
 	"qspiroot=/dev/mtdblock1\0" \
 	"qspirootfstype=jffs2\0" \
