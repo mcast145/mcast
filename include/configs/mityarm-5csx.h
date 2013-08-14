@@ -173,7 +173,8 @@
 #define CONFIG_CMDLINE_EDITING
 #define CONFIG_SYS_PROMPT_HUSH_PS2	"> "
 #define CONFIG_CMD_RUN
-
+/* look for preboot env command to run before boot */
+#define CONFIG_PREBOOT
 #define CONFIG_BOOTCOMMAND "run mmcload; run mmcboot"
 
 /*
@@ -434,6 +435,7 @@ define CONFIG_CMD_USB		1
 #define CONFIG_SPI_FLASH_STMICRO	/* Micron/Numonyx flash */
 #define CONFIG_CMD_SF			/* Serial flash commands */
 /* Flash device info */
+/* We are running the QSPI slow until we firgure out the issue with high speed use */
 #define CONFIG_SF_DEFAULT_SPEED		(10000000)
 #define CONFIG_SF_DEFAULT_MODE		SPI_MODE_3
 #define CONFIG_SPI_FLASH_QUAD		(1)
