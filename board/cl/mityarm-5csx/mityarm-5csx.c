@@ -31,6 +31,7 @@
 #include <micrel.h>
 #include <miiphy.h>
 #include <../drivers/net/designware.h>
+#include <environment.h>
 
 #include <altera.h>
 #include <fpga.h>
@@ -190,7 +191,7 @@ int misc_init_r(void)
                 sprintf((char *)tmp, "%02x:%02x:%02x:%02x:%02x:%02x", eth_addr[0],
                         eth_addr[1], eth_addr[2], eth_addr[3], eth_addr[4], eth_addr[5]);
 
-                setenv("ethaddr", (char *)tmp);
+                env_check_apply("ethaddr", "", (char *)tmp, H_FORCE);
         }
 	return 0;
 }
