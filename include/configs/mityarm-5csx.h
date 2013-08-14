@@ -434,7 +434,7 @@ define CONFIG_CMD_USB		1
 #define CONFIG_SPI_FLASH_STMICRO	/* Micron/Numonyx flash */
 #define CONFIG_CMD_SF			/* Serial flash commands */
 /* Flash device info */
-#define CONFIG_SF_DEFAULT_SPEED		(50000000)
+#define CONFIG_SF_DEFAULT_SPEED		(10000000)
 #define CONFIG_SF_DEFAULT_MODE		SPI_MODE_3
 #define CONFIG_SPI_FLASH_QUAD		(1)
 /* QSPI page size and block size */
