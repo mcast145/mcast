@@ -186,6 +186,8 @@
 
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"verify=n\0" \
+	"initphy=gpio set 48; gpio clear 48; sleep 0.4\0"\
+	"preboot=run initphy\0"\
 	"loadaddr=" MK_STR(CONFIG_SYS_LOAD_ADDR) "\0" \
 	"fdtaddr=0x00000100\0" \
 	"bootimage=uImage\0" \
