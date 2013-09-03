@@ -188,10 +188,13 @@ int misc_init_r(void)
 
         if(is_valid_ether_addr(eth_addr)) {
 		char tmp[24];
+		char* env_ethaddr = getenv("ethaddr");
                 sprintf((char *)tmp, "%02x:%02x:%02x:%02x:%02x:%02x", eth_addr[0],
                         eth_addr[1], eth_addr[2], eth_addr[3], eth_addr[4], eth_addr[5]);
 
-                env_check_apply("ethaddr", "", (char *)tmp, H_FORCE);
+		debug("FC Ethernet MAC: %s Env: %s\n",tmp, env_ethaddr);
+		if(!env_ethaddr || (0 != strncmp(tmp, env_ethaddr,18)))
+			setenv("ethaddr", (char *)tmp);
         }
 	return 0;
 }

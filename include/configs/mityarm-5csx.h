@@ -240,6 +240,9 @@
 #if (CONFIG_PRELOADER_BOOT_FROM_SDMMC == 1)
 /* Store envirnoment in MMC card */
 #define CONFIG_ENV_IS_IN_MMC
+/* Allow overwriting the (default) ethernet address once */
+#define CONFIG_OVERWRITE_ETHADDR_ONCE
+#define CONFIG_ETHADDR "00:00:00:00:00:00"
 #else
 /* Store envirnoment in SPI flash */
 #define CONFIG_ENV_IS_IN_SPI_FLASH
