@@ -23,18 +23,13 @@
 
 #include <netdev.h>
 #include <mmc.h>
-#include <linux/dw_mmc.h>
 #include <asm/arch/interrupts.h>
 #include <asm/arch/sdram.h>
-#include <asm/arch/sdmmc.h>
 #include <phy.h>
 #include <micrel.h>
 #include <miiphy.h>
 #include <../drivers/net/designware.h>
 #include <environment.h>
-
-#include <altera.h>
-#include <fpga.h>
 
 #include "config_block.h"
 
@@ -42,56 +37,6 @@
 #define I2C_EEPROM_ADDR 0x50
 
 DECLARE_GLOBAL_DATA_PTR;
-
-/*
- * Declaration for DW MMC structure
- */
-#ifdef CONFIG_DW_MMC
-struct dw_host socfpga_dw_mmc_host = {
-	.need_init_cmd = 1,
-	.clock_in = CONFIG_HPS_CLK_SDMMC_HZ / 4,
-	.reg = (struct dw_registers *)CONFIG_SDMMC_BASE,
-#ifdef CONFIG_SOCFPGA_VIRTUAL_TARGET
-	.set_timing = NULL,
-	.use_hold_reg = NULL,
-#else
-	.set_timing = sdmmc_set_clk_timing,
-	.use_hold_reg = sdmmc_use_hold_reg,
-#endif
-};
-#endif
-
-/*
- * FPGA programming support for SoC FPGA Cyclone V
- */
-/* currently only single FPGA device avaiable on dev kit */
-Altera_desc altera_fpga[CONFIG_FPGA_COUNT] = {
-	{Altera_SoCFPGA, /* family */
-	fast_passive_parallel, /* interface type */
-	-1,		/* no limitation as
-			additional data will be ignored */
-	NULL,		/* no device function table */
-	NULL,		/* base interface address specified in driver */
-	0}		/* no cookie implementation */
-};
-
-/* add device descriptor to FPGA device table */
-void socfpga_fpga_add(void)
-{
-	int i;
-	fpga_init();
-	for (i = 0; i < CONFIG_FPGA_COUNT; i++)
-		fpga_add(fpga_altera, &altera_fpga[i]);
-}
-
-/*
- * Print CPU information
- */
-int print_cpuinfo(void)
-{
-	puts("CPU   : Critical Link MityARM-SOCFPGA\n");
-	return 0;
-}
 
 /*
  * Print Board information
@@ -169,21 +114,15 @@ int board_early_init_f(void)
 int board_init(void)
 {
 	int rv = 0;
+	uint8_t eth_addr[10];
 	/* adress of boot parameters (ATAG or FDT blob) */
 	gd->bd->bi_boot_params = 0x00000100;
+
 	rv = read_eeprom();
 	if ( 0 != rv) {
 		memset(&factory_config_block, '\0', sizeof(factory_config_block));
 	}
 
-	return rv;
-}
-
-int misc_init_r(void)
-{
-	uint8_t eth_addr[10];
-	/* add device descriptor to FPGA device table */
-	socfpga_fpga_add();
         memcpy(eth_addr,factory_config_block.MACADDR, 6);
 
         if(is_valid_ether_addr(eth_addr)) {
@@ -196,21 +135,13 @@ int misc_init_r(void)
 		if(!env_ethaddr || (0 != strncmp(tmp, env_ethaddr,18)))
 			setenv("ethaddr", (char *)tmp);
         }
-	return 0;
-}
 
-#if defined(CONFIG_SYS_CONSOLE_IS_IN_ENV) && defined(CONFIG_SYS_CONSOLE_OVERWRITE_ROUTINE)
-int overwrite_console(void)
-{
-	return 0;
+	return rv;
 }
-#endif
 
 /* EMAC related setup */
-
 #define MICREL_KSZ9021_EXTREG_CTRL 11
 #define MICREL_KSZ9021_EXTREG_DATA_WRITE 12
-
 
 /*
  * Write the extended registers in the PHY
@@ -266,32 +197,55 @@ int designware_board_phy_init(struct eth_device *dev, int phy_addr,
 		int (*mii_write)(struct eth_device *, u8, u8, u16),
 		int (*dw_reset_phy)(struct eth_device *))
 {
+	struct dw_eth_dev *priv = dev->priv;
+	struct phy_device *phydev;
 	struct mii_dev *bus;
-	unsigned int phyid;
-	int ret = 0;
 
 	if ((*dw_reset_phy)(dev) < 0)
 		return -1;
 
-	bus = miiphy_get_active_dev(dev->name);
-	if (!bus)
-		return 1;
+	bus = mdio_get_current_dev();
+	phydev = phy_connect(bus, phy_addr, dev,
+		priv->interface);
 
-	if (get_phy_id(bus, phy_addr, MDIO_DEVAD_NONE, &phyid) != 0) {
-		puts("Net:   failed to get phyid\n");
-		return -1;
+	/* Micrel PHY is connected to EMAC1 */
+	if (strcasecmp(phydev->drv->name, "Micrel ksz9021") == 0 &&
+		((phydev->drv->uid & phydev->drv->mask) ==
+		(phydev->phy_id & phydev->drv->mask))) {
+
+		printf("Configuring PHY skew timing for %s\n",
+			phydev->drv->name);
+
+		/* min rx data delay */
+		if (ksz9021_phy_extended_write(phydev,
+			MII_KSZ9021_EXT_RGMII_RX_DATA_SKEW,
+			getenv_ulong(CONFIG_KSZ9021_DATA_SKEW_ENV, 16,
+				CONFIG_KSZ9021_DATA_SKEW_VAL)) < 0)
+			return -1;
+		/* min tx data delay */
+		if (ksz9021_phy_extended_write(phydev,
+			MII_KSZ9021_EXT_RGMII_TX_DATA_SKEW,
+			getenv_ulong(CONFIG_KSZ9021_DATA_SKEW_ENV, 16,
+				CONFIG_KSZ9021_DATA_SKEW_VAL)) < 0)
+			return -1;
+		/* max rx/tx clock delay, min rx/tx control */
+		if (ksz9021_phy_extended_write(phydev,
+			MII_KSZ9021_EXT_RGMII_CLOCK_SKEW,
+			getenv_ulong(CONFIG_KSZ9021_CLK_SKEW_ENV, 16,
+				CONFIG_KSZ9021_CLK_SKEW_VAL)) < 0)
+			return -1;
+
+		if (phydev->drv->config)
+			phydev->drv->config(phydev);
 	}
-	printf("Net PHY ID: 0x%08x\n", phyid);
-
-	if ((MICREL_PHY_ID_KSZ9021 | MICREL_PHY_50MHZ_CLK) == phyid)
-		ret = eth_set_ksz9021_skew(dev, phy_addr, mii_write);
-
-	return ret;
+	return 0;
 }
 
 /* We know all the init functions have been run now */
 int board_eth_init(bd_t *bis)
 {
+#if !defined(CONFIG_SOCFPGA_VIRTUAL_TARGET) && \
+!defined(CONFIG_SPL_BUILD)
 
 	/* Initialize EMAC */
 
@@ -324,14 +278,11 @@ int board_eth_init(bd_t *bis)
 #endif
 #if (CONFIG_EMAC_BASE == CONFIG_EMAC0_BASE)
 		SYSMGR_EMACGRP_CTRL_PHYSEL0_LSB));
-#elif (CONFIG_EMAC_BASE == CONFIG_EMAC1_BASE)
-		SYSMGR_EMACGRP_CTRL_PHYSEL1_LSB));
-#endif
-
 	/* Release the EMAC controller from reset */
-#if (CONFIG_EMAC_BASE == CONFIG_EMAC0_BASE)
 	emac0_reset_enable(0);
 #elif (CONFIG_EMAC_BASE == CONFIG_EMAC1_BASE)
+		SYSMGR_EMACGRP_CTRL_PHYSEL1_LSB));
+	/* Release the EMAC controller from reset */
 	emac1_reset_enable(0);
 #endif
 
@@ -349,16 +300,6 @@ int board_eth_init(bd_t *bis)
 #endif
 	debug("board_eth_init %d\n", rval);
 	return rval;
-}
-
-/*
- * Initializes MMC controllers.
- * to override, implement board_mmc_init()
- */
-int cpu_mmc_init(bd_t *bis)
-{
-#ifdef CONFIG_DW_MMC
-	return dw_mmc_init(&socfpga_dw_mmc_host);
 #else
 	return 0;
 #endif
@@ -371,10 +312,3 @@ int board_late_init(void)
 }
 #endif
 
-#ifndef CONFIG_SYS_DCACHE_OFF
-void enable_caches(void)
-{
-	/* Enable D-cache. I-cache is already enabled in start.S */
-	dcache_enable();
-}
-#endif
