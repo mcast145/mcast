@@ -114,9 +114,17 @@ int board_early_init_f(void)
 int board_init(void)
 {
 	int rv = 0;
-	uint8_t eth_addr[10];
+
 	/* adress of boot parameters (ATAG or FDT blob) */
 	gd->bd->bi_boot_params = 0x00000100;
+
+	return rv;
+}
+
+int misc_init_r_ext(void)
+{
+	int rv = 0;
+	uint8_t eth_addr[10];
 
 	rv = read_eeprom();
 	if ( 0 != rv) {
@@ -131,7 +139,6 @@ int board_init(void)
                 sprintf((char *)tmp, "%02x:%02x:%02x:%02x:%02x:%02x", eth_addr[0],
                         eth_addr[1], eth_addr[2], eth_addr[3], eth_addr[4], eth_addr[5]);
 
-		debug("FC Ethernet MAC: %s Env: %s\n",tmp, env_ethaddr);
 		if(!env_ethaddr || (0 != strncmp(tmp, env_ethaddr,18)))
 			setenv("ethaddr", (char *)tmp);
         }

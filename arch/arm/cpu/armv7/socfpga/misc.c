@@ -68,6 +68,11 @@ int print_cpuinfo(void)
 	return 0;
 }
 
+int __weak misc_init_r_ext(void)
+{
+	return 0;
+}
+
 int misc_init_r(void)
 {
 	char buf[32];
@@ -115,6 +120,8 @@ int misc_init_r(void)
 		"go $fpga2sdram_apply; "
 		"mw $axibridge 0; "
 		"mw $l3remap 0x1 ");
+
+	misc_init_r_ext();
 
 	return 0;
 }
