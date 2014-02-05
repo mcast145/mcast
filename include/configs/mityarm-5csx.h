@@ -17,9 +17,16 @@
 #ifndef __CONFIG_H
 #define __CONFIG_H
 
+#include <asm/arch/socfpga_base_addrs.h>
+#include "../../board/cl/mityarm-5csx/build.h"
+#include "../../board/cl/mityarm-5csx/pinmux_config.h"
+#include "../../board/cl/mityarm-5csx/pll_config.h"
+#include "../../board/cl/mityarm-5csx/sdram/sdram_config.h"
+#include "../../board/cl/mityarm-5csx/reset_config.h"
+
 #include "socfpga_common.h"
 #ifdef CONFIG_SPL_BUILD
-#include "../../board/altera/socfpga/iocsr_config_cyclone5.h"
+#include "../../board/cl/mityarm-5csx/iocsr_config_cyclone5.h"
 #endif
 
 #define COMPANY_NAME "Critical Link"

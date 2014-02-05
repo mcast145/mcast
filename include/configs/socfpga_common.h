@@ -17,13 +17,6 @@
 #ifndef __CONFIG_COMMON_H
 #define __CONFIG_COMMON_H
 
-#include <asm/arch/socfpga_base_addrs.h>
-#include "../../board/altera/socfpga/build.h"
-#include "../../board/altera/socfpga/pinmux_config.h"
-#include "../../board/altera/socfpga/pll_config.h"
-#include "../../board/altera/socfpga/sdram/sdram_config.h"
-#include "../../board/altera/socfpga/reset_config.h"
-
 /* Enabled for U-Boot debug message printout? */
 /*#define DEBUG*/
 /* if panic, will call hang as watchdog will come and trigger warm reset */
