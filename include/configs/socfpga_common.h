@@ -665,7 +665,9 @@
  * Boot from NAND
  */
 #ifndef CONFIG_PRELOADER_BOOT_FROM_NAND
-#error "CONFIG_PRELOADER_BOOT_FROM_NAND must be defined"
+/* 13.1 doesn't generate this variable */
+/* #error "CONFIG_PRELOADER_BOOT_FROM_NAND must be defined" */
+#define CONFIG_PRELOADER_BOOT_FROM_NAND (0)
 #endif
 #if (CONFIG_PRELOADER_BOOT_FROM_NAND == 1)
 /* Support for drivers/mmc/libmmc.o in SPL binary */
