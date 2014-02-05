@@ -1,1 +1,0 @@
-../../altera/socfpga/iocsr_config_cyclone5.c

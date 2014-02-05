@@ -1,1 +1,0 @@
-../../altera/socfpga/reset_config.h

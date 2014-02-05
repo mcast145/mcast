@@ -1,1 +1,0 @@
-../../altera/socfpga/build.h

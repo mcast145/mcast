@@ -1,1 +1,0 @@
-../../altera/socfpga/pll_config.h
