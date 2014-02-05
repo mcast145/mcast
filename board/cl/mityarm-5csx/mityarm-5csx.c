@@ -201,8 +201,13 @@ int designware_board_phy_init(struct eth_device *dev, int phy_addr,
 	struct phy_device *phydev;
 	struct mii_dev *bus;
 
+	printf("%s: enter\n", __func__);
+
 	if ((*dw_reset_phy)(dev) < 0)
+	{
+		printf("%s: reset phy failed\n", __func__);
 		return -1;
+	}
 
 	bus = mdio_get_current_dev();
 	phydev = phy_connect(bus, phy_addr, dev,

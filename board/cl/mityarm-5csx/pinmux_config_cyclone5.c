@@ -1,0 +1,1 @@
+../../altera/socfpga/pinmux_config_cyclone5.c
