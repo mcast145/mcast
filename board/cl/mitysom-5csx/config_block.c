@@ -261,7 +261,7 @@ done:
 }
 
 U_BOOT_CMD(factoryconfig,	CONFIG_SYS_MAXARGS,	0,	do_factoryconfig,
-        "mityarm-5csx factory config block operations",
+        "mitysom-5csx factory config block operations",
 	     "    - print current configuration\n"
 	"factoryconfig set\n"
 	"         - set new configuration (interactive)\n"

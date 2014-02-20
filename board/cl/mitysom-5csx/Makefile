@@ -26,7 +26,7 @@ include $(TOPDIR)/config.mk
 
 LIB	= $(obj)lib$(BOARD).o
 
-COBJS-y	:= mityarm-5csx.o config_block.o
+COBJS-y	:= mitysom-5csx.o config_block.o
 COBJS-$(CONFIG_SPL_BUILD) += pinmux_config_cyclone5.o iocsr_config_cyclone5.o
 
 COBJS	:= $(COBJS-y)
