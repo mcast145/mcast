@@ -25,6 +25,7 @@
 #include <netdev.h>
 #include "../../../drivers/net/designware.h"
 #endif
+#include <i2c.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -37,6 +38,9 @@ int board_early_init_f(void)
 	/* disable the watchdog when entering U-Boot */
 	watchdog_disable();
 #endif
+	/* calculate the clock frequencies required for drivers */
+	cm_derive_clocks_for_drivers();
+
 	return 0;
 }
 
@@ -47,12 +51,62 @@ int board_init(void)
 {
 	/* adress of boot parameters for ATAG (if ATAG is used) */
 	gd->bd->bi_boot_params = 0x00000100;
+
+	/*
+	 * reinitialize the global variable for clock value as after
+	 * relocation, the global variable are cleared to zeroes
+	 */
+	cm_derive_clocks_for_drivers();
 	return 0;
+}
+
+static void setenv_ethaddr_eeprom(void)
+{
+	uint addr, alen;
+	int linebytes;
+	uchar chip, enetaddr[6], temp;
+
+	/* configuration based on dev kit EEPROM */
+	chip = 0x51;		/* slave ID for EEPROM */
+	alen = 2;		/* dev kit using 2 byte addressing */
+	linebytes = 6;		/* emac address stored in 6 bytes address */
+
+#if (CONFIG_EMAC_BASE == CONFIG_EMAC0_BASE)
+	addr = 0x16c;
+#elif (CONFIG_EMAC_BASE == CONFIG_EMAC1_BASE)
+	addr = 0x174;
+#endif
+
+	i2c_read(chip, addr, alen, enetaddr, linebytes);
+
+	/* swapping endian to match board implementation */
+	temp = enetaddr[0];
+	enetaddr[0] = enetaddr[5];
+	enetaddr[5] = temp;
+	temp = enetaddr[1];
+	enetaddr[1] = enetaddr[4];
+	enetaddr[4] = temp;
+	temp = enetaddr[2];
+	enetaddr[2] = enetaddr[3];
+	enetaddr[3] = temp;
+
+	if (is_valid_ether_addr(enetaddr))
+		eth_setenv_enetaddr("ethaddr", enetaddr);
+	else
+		puts("Skipped ethaddr assignment due to invalid "
+			"EMAC address in EEPROM\n");
 }
 
 #ifdef CONFIG_BOARD_LATE_INIT
 int board_late_init(void)
 {
+	uchar enetaddr[6];
+
+	setenv_addr("setenv_ethaddr_eeprom", (void *)setenv_ethaddr_eeprom);
+
+	/* if no ethaddr environment, get it from EEPROM */
+	if (!eth_getenv_enetaddr("ethaddr", enetaddr))
+		setenv_ethaddr_eeprom();
 	return 0;
 }
 #endif

@@ -21,6 +21,9 @@
 #include <linux/linkage.h>
 #include <asm/arch/sdram.h>
 #include <asm/system.h>
+#include <asm-offsets.h>
+#include <asm/arch/reset_manager.h>
+#include <asm/arch/clock_manager.h>
 
 #define PRELOADER_DEBUG_MEMMORY_MAGIC		0x444d
 #define PRELOADER_DEBUG_MEMMORY_VERSION		0x1
@@ -33,6 +36,21 @@
 save_boot_params:
 
 #ifdef CONFIG_SPL_BUILD
+	/*
+	 * If BSEL is zero, then the bootrom has not
+         * handed any information to preloader.
+         */
+	ldr	r9,=SYSMGR_BOOTINFO
+	ldr 	r9, [r9]
+	and	r9, r9, #SYSMGR_BOOTINFO_BSEL_MASK
+	cmp	r9, #0
+	bne	bsel_non_zero
+	ldr	r4, =rst_mgr_status
+	ldr	r5, =RSTMGR_COLDRST_MASK
+	str	r5, [r4]
+	b	bsel_zero
+
+bsel_non_zero:
 #if (CONFIG_PRELOADER_DEBUG_MEMORY_WRITE == 1)
 	/*
 	 * write the debug memory header and value of R0 - R3 (which passed
@@ -47,12 +65,13 @@ save_boot_params:
 #endif	/* CONFIG_PRELOADER_DEBUG_MEMORY_WRITE */
 #if (CONFIG_PRELOADER_WARMRST_SKIP_CFGIO == 1)
 	/* get the reset manager status register passed by BootROM */
-	add	r5, r0,#0x34
+	add	r5, r0,#0x38
 	ldr	r4, =rst_mgr_status
 	ldr	r5, [r5]
 	str	r5, [r4]
 #endif /* CONFIG_PRELOADER_WARMRST_SKIP_CFGIO */
 
+bsel_zero:
 #if (CONFIG_PRELOADER_EXE_ON_FPGA == 1)
 	/* relocate the .data section to supprt preloader execute on FPGA */
 	ldr	r0, =__data_start
@@ -64,6 +83,19 @@ relocate_loop:
 	cmp	r1, r2			/* until target end addreee [r2] */
 	blo	relocate_loop
 #endif	/* CONFIG_PRELOADER_EXE_ON_FPGA */
+
+	/*
+	 *Initialize the early stack point on OCRAM. This is to avoid OCRAM
+	 * false double bit error as OCRAM always ready in 64 bit manner
+	 */
+	ldr	r1, =(CONFIG_SYS_INIT_SP_ADDR)	/* start of temporary SP */
+	sub	r0, r1, #GD_SIZE	/* start of mem init */
+	mov	r2, #0x00000000		/* prepare zero to mem init */
+clrsp:	cmp	r0, r1			/* while not at end of BSS */
+	strlo	r2, [r0]		/* clear 32-bit BSS word */
+	addlo	r0, r0, #4		/* move to next */
+	blo	clrsp
+
 #endif	/* CONFIG_SPL_BUILD */
 	bx	lr
 
@@ -80,11 +112,11 @@ ENTRY(relocate_stack_to_sdram)
 	sub	r1, r4, r3		/* [r1] target address */
 	mov	r5, r1			/* [r5] new sp within SDRAM */
 
-relocate_loop:
+relocate_loop1:
 	ldmia	r0!, {r3}
 	stmia	r1!, {r3}
 	cmp	r0, r2
-	blo	relocate_loop
+	blo	relocate_loop1
 
 	/* assign SP to new address within SDRAM now */
 	mov	sp, r5
@@ -121,10 +153,11 @@ sdram_applycfg_ocram:
 	isb
 
 	mrc	p15, 0, r4, c1, c0, 0	@ Read CP15 SCTRL Register
-	orr	r4, r0, #CR_Z		@ Enable back branch predictor
-	orr	r4, r0, #CR_I		@ Enable back i-cache
+	orr	r4, r4, #CR_Z		@ Enable back branch predictor
+	orr	r4, r4, #CR_I		@ Enable back i-cache
 	mcr	p15, 0, r4, c1, c0, 0	@ Write CP15 SCTRL Register
 
+	mov	r0, #0
 	mov	pc, lr
 
 SDR_CTRL:		.word	SOCFPGA_SDR_ADDRESS
@@ -192,4 +225,64 @@ write_byte:
 write_end:
 	POP	{r4-r11, pc}
 ENDPROC(fpgamgr_axi_write)
+
+/*
+ * Relocate the sdram_applycfg_ocram function to OCRAM and call it
+ */
+ENTRY(reset_clock_manager)
+	/* Put Main PLL and Peripheral PLL in bypass */
+	ldr	r0, SOCFPGA_CLKMGR
+	mov	r1, #CLKMGR_BYPASS_ADDRESS
+	mov	r2, #CLKMGR_BYPASS_MAIN_PER_PLL_MASK
+	add	r3, r0, r1
+	ldr	r4, [r3]
+	orr	r5, r4, r2
+	str	r5, [r3]
+	dsb
+	isb
+	mov	r1, #CLKMGR_MAINPLLGRP_MAINQSPICLK_ADDRESS
+	mov	r2, #CLKMGR_MAINQSPICLK_RESET_VALUE
+	add	r3, r0, r1
+	str	r2, [r3]
+	mov	r1, #CLKMGR_MAINPLLGRP_MAINNANDSDMMCCLK_ADDRESS
+	mov	r2, #CLKMGR_MAINNANDSDMMCCLK_RESET_VALUE
+	add	r3, r0, r1
+	str	r2, [r3]
+	mov	r1, #CLKMGR_PERPLLGRP_PERQSPICLK_ADDRESS
+	mov	r2, #CLKMGR_PERQSPICLK_RESET_VALUE
+	add	r3, r0, r1
+	str	r2, [r3]
+	mov	r1, #CLKMGR_PERPLLGRP_PERNANDSDMMCCLK_ADDRESS
+	mov	r2, #CLKMGR_PERNANDSDMMCCLK_RESET_VALUE
+	add	r3, r0, r1
+	str	r2, [r3]
+
+	/* Disable the RAM boot */
+	ldr	r0, SOCFPGA_RSTMGR
+	ldr	r1, SYSMGR_WARMRAMGRP_ENABLE
+	mov	r2, #0
+	str	r2, [r1]
+
+	/* Trigger warm reset to continue boot normally */
+	mov	r1, #RSTMGR_CTRL_OFFSET
+	add	r2, r0, r1
+	mov	r3, #1
+	mov	r3, r3, LSL #RSTMGR_CTRL_SWWARMRSTREQ_LSB
+	ldr	r4, [r2]
+	orr	r4, r3, r4
+	str	r4, [r2]
+
+reset_clock_manager_loop:
+	dsb
+	isb
+	b	reset_clock_manager_loop
+ENDPROC(reset_clock_manager)
+
+SOCFPGA_CLKMGR:			.word	SOCFPGA_CLKMGR_ADDRESS
+SOCFPGA_RSTMGR:			.word	SOCFPGA_RSTMGR_ADDRESS
+SYSMGR_WARMRAMGRP_ENABLE:	.word	CONFIG_SYSMGR_WARMRAMGRP_ENABLE
+
+.globl reset_clock_manager_size
+reset_clock_manager_size:
+	.word	. - reset_clock_manager
 

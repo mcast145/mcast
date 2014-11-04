@@ -17,6 +17,9 @@
 #ifndef __CONFIG_COMMON_H
 #define __CONFIG_COMMON_H
 
+#include <asm/arch/hardware.h>
+#include <asm/arch/clock_manager.h>
+
 /* Enabled for U-Boot debug message printout? */
 /*#define DEBUG*/
 /* if panic, will call hang as watchdog will come and trigger warm reset */
@@ -65,6 +68,8 @@
 /* Enable board late init for ECC setup if IRQ enabled */
 #define CONFIG_BOARD_LATE_INIT
 #endif
+/* Enable THUMB2 mode to reduce software size which yield better boot time */
+#define CONFIG_SYS_THUMB_BUILD
 
 /*
  * Display CPU and Board Info
@@ -151,6 +156,8 @@
 #define CONFIG_ENV_OVERWRITE
 /* Enable auto completion of commands using TAB */
 #define CONFIG_AUTO_COMPLETE
+/* Enable editing and history functions for interactive CLI operations */
+#define CONFIG_CMDLINE_EDITING
 /* Additional help message */
 #define CONFIG_SYS_LONGHELP
 /* use "hush" command parser */
@@ -178,7 +185,7 @@
 	"bootimage=zImage\0" \
 	"bootimagesize=0x600000\0" \
 	"fdtimage=socfpga.dtb\0" \
-	"fdtimagesize=0x5000\0" \
+	"fdtimagesize=0x7000\0" \
 	"mmcloadcmd=fatload\0" \
 	"mmcloadpart=1\0" \
 	"mmcroot=/dev/mmcblk0p2\0" \
@@ -295,17 +302,29 @@
 /* SDRAM Bank #1 */
 #define CONFIG_SYS_SDRAM_BASE		0x00000000
 /* SDRAM memory size */
+/*
+ * Enable auto calculation of sdram size. Code will ignore PHYS_SDRAM_1_SIZE
+ * Auto calculation can be disabled for use case where user want to
+ * utilize portion of SDRAM only (PHYS_SDRAM_1_SIZE will be used then)
+ */
+#define CONFIG_SDRAM_CALCULATE_SIZE
+/*
+ * Remain PHYS_SDRAM_1_SIZE as its still used by U-Boot memory test (mtest)
+ * when user didn't specify mtest end address in console
+ */
 #ifdef CONFIG_SOCFPGA_VIRTUAL_TARGET
 #define PHYS_SDRAM_1_SIZE		0x80000000
 #else
-#define PHYS_SDRAM_1_SIZE		0x40000000
+/* Put to 32MB as the smallest SDRAM size to prevent mtest from failing */
+#define PHYS_SDRAM_1_SIZE		0x02000000
 #endif
 /* SDRAM Bank #1 base address */
 #define PHYS_SDRAM_1			CONFIG_SYS_SDRAM_BASE
-/* memtest setup */
+/* U-Boot memtest setup */
 /* Begin and end addresses of the area used by the simple memory test.c */
 #define CONFIG_SYS_MEMTEST_START	0x00000000
 #define CONFIG_SYS_MEMTEST_END		PHYS_SDRAM_1_SIZE
+
 
 /*
  * L2 PL-310
@@ -332,16 +351,13 @@
 #define UART0_BASE			SOCFPGA_UART0_ADDRESS
 #define CONFIG_SYS_NS16550_SERIAL
 #define CONFIG_SYS_NS16550_REG_SIZE	-4
-#define CONFIG_SYS_NS16550_CLK          V_NS16550_CLK
 #define CONFIG_CONS_INDEX               1
 #define CONFIG_SYS_NS16550_COM1		UART0_BASE
 #define CONFIG_SYS_BAUDRATE_TABLE {4800, 9600, 19200, 38400, 57600, 115200}
 #if defined(CONFIG_SOCFPGA_VIRTUAL_TARGET)
-#define V_NS16550_CLK			1000000
-#elif defined(CONFIG_SPL_BUILD)
-#define V_NS16550_CLK			CONFIG_HPS_CLK_L4_SP_HZ
+#define CONFIG_SYS_NS16550_CLK		1000000
 #else
-#define V_NS16550_CLK			(100000000)
+#define CONFIG_SYS_NS16550_CLK		(cm_l4_sp_clock)
 #endif
 #define CONFIG_BAUDRATE			115200
 #endif /* CONFIG_SYS_NS16550 */
@@ -354,10 +370,12 @@
 /*
  * USB
  */
-/*#define CONFIG_CMD_USB		1
-#define CONFIG_USB_STORAGE		1
-#define CONFIG_USB_DWC_OTG_HCD		1
-#define CONFIG_DOS_PARTITION		1*/
+#define CONFIG_SYS_USB_ADDRESS SOCFPGA_USB1_ADDRESS
+#define CONFIG_CMD_USB
+#define CONFIG_USB_DWC2_OTG
+#define CONFIG_USB_STORAGE
+#define CONFIG_USB_HOST_ETHER
+#define CONFIG_USB_ETHER_ASIX
 
 /*
  * L4 OSC1 Timer 0
@@ -372,10 +390,9 @@
 /* Clocks source frequency to timer */
 #if defined(CONFIG_SOCFPGA_VIRTUAL_TARGET)
 #define CONFIG_TIMER_CLOCK_KHZ		2400
-#elif defined(CONFIG_SPL_BUILD)
-#define CONFIG_TIMER_CLOCK_KHZ		(CONFIG_HPS_CLK_OSC1_HZ/1000)
 #else
-#define CONFIG_TIMER_CLOCK_KHZ		(25000)
+/* Preloader and U-Boot need to know the clock source frequency from handoff*/
+#define CONFIG_TIMER_CLOCK_KHZ		(CONFIG_HPS_CLK_OSC1_HZ / 1000)
 #endif
 
 /*
@@ -388,10 +405,9 @@
 /* Clocks source frequency to watchdog timer */
 #if defined(CONFIG_SOCFPGA_VIRTUAL_TARGET)
 #define CONFIG_DW_WDT_CLOCK_KHZ		2400
-#elif defined(CONFIG_SPL_BUILD)
-#define CONFIG_DW_WDT_CLOCK_KHZ		(CONFIG_HPS_CLK_OSC1_HZ/1000)
 #else
-#define CONFIG_DW_WDT_CLOCK_KHZ		(25000)
+/* Preloader and U-Boot need to know the clock source frequency from handoff*/
+#define CONFIG_DW_WDT_CLOCK_KHZ		(CONFIG_HPS_CLK_OSC1_HZ / 1000)
 #endif
 
 /*
@@ -447,12 +463,11 @@
 #define CONFIG_DWMMC_FIFO_DEPTH		1024
 /* using smaller max blk cnt to avoid flooding the limited stack we have */
 #define CONFIG_SYS_MMC_MAX_BLK_COUNT     256
+#define CONFIG_DWMMC_BUS_HZ		(cm_sdmmc_clock)
 #if defined(CONFIG_SPL_BUILD)
 #define CONFIG_DWMMC_BUS_WIDTH		CONFIG_HPS_SDMMC_BUSWIDTH
-#define CONFIG_DWMMC_BUS_HZ		(CONFIG_HPS_CLK_SDMMC_HZ / 4)
 #else
 #define CONFIG_DWMMC_BUS_WIDTH		4
-#define CONFIG_DWMMC_BUS_HZ		(50000000)
 #endif	/* CONFIG_SPL_BUILD */
 #endif	/* CONFIG_MMC */
 
@@ -479,11 +494,7 @@
 #define CONFIG_SF_DEFAULT_MODE		SPI_MODE_3
 #define CONFIG_SPI_FLASH_QUAD		(1)
 /* QSPI reference clock */
-#if defined(CONFIG_SPL_BUILD)
-#define CONFIG_CQSPI_REF_CLK		CONFIG_HPS_CLK_QSPI_HZ
-#else
-#define CONFIG_CQSPI_REF_CLK		(400000000)
-#endif	/* CONFIG_SPL_BUILD */
+#define CONFIG_CQSPI_REF_CLK		(cm_qspi_clock)
 /* QSPI page size and block size */
 #define CONFIG_CQSPI_PAGE_SIZE		(256)
 #define CONFIG_CQSPI_BLOCK_SIZE		(16)
@@ -525,6 +536,25 @@
 /* Enable FPGA command at console */
 #define CONFIG_CMD_FPGA
 
+/*
+ * DMA support
+ */
+#define CONFIG_PL330_DMA
+#define CONFIG_SPL_DMA_SUPPORT
+
+/*
+ * I2C support
+ */
+#define CONFIG_HARD_I2C
+#define CONFIG_DW_I2C
+#define CONFIG_SYS_I2C_BASE		SOCFPGA_I2C0_ADDRESS
+/* using standard mode which the speed up to 100Kb/s) */
+#define CONFIG_SYS_I2C_SPEED		(100000)
+/* address of device when used as slave */
+#define CONFIG_SYS_I2C_SLAVE		(0x02)
+/* clock supplied to I2C controller in unit of MHz */
+#define IC_CLK				(cm_l4_sp_clock / 1000000)
+#define CONFIG_CMD_I2C
 
 /*
  * SPL "Second Program Loader" aka Preloader
@@ -719,15 +749,17 @@
 /*
  * Support for FAT partition if boot from SDMMC
  */
-#if (CONFIG_PRELOADER_BOOT_FROM_SDMMC == 1)
+#if (CONFIG_PRELOADER_BOOT_FROM_SDMMC == 1 && CONFIG_PRELOADER_FAT_SUPPORT == 1)
 /* MMC with FAT partition support */
-#undef CONFIG_SPL_FAT_SUPPORT
+#define CONFIG_SPL_FAT_SUPPORT
 #endif
 
 #ifdef CONFIG_SPL_FAT_SUPPORT
 #define CONFIG_SPL_LIBDISK_SUPPORT
-#define CONFIG_SYS_MMC_SD_FAT_BOOT_PARTITION	1
-#define CONFIG_SPL_FAT_LOAD_PAYLOAD_NAME	"u-boot.img"
+#define CONFIG_SYS_MMC_SD_FAT_BOOT_PARTITION	\
+				CONFIG_PRELOADER_FAT_BOOT_PARTITION
+#define CONFIG_SPL_FAT_LOAD_PAYLOAD_NAME	\
+				CONFIG_PRELOADER_FAT_LOAD_PAYLOAD_NAME
 #endif /* CONFIG_SPL_FAT_SUPPORT */
 
 /*
@@ -761,6 +793,15 @@
 #undef CONFIG_SPL_FPGA_LOAD
 /* location of FPGA RBF image within QSPI */
 #define CONFIG_SPL_FPGA_QSPI_ADDR	(0x800000)
+/* RBF file name if its located within SD card */
+#define CONFIG_SPL_FPGA_FAT_NAME	"fpga.rbf"
+
+/* ensure FAT is defined if CONFIG_SPL_FPGA_LOAD is defined */
+#ifdef CONFIG_SPL_FPGA_LOAD
+#if (CONFIG_PRELOADER_BOOT_FROM_SDMMC == 1 && !defined(CONFIG_SPL_FAT_SUPPORT))
+#error "CONFIG_SPL_FAT_SUPPORT required for  CONFIG_SPL_FPGA_LOAD"
+#endif	/* CONFIG_SPL_FAT_SUPPORT */
+#endif	/* CONFIG_SPL_FPGA_LOAD */
 
 /*
  * Enable memory padding if SDRAM ECC is enabled
@@ -768,5 +809,7 @@
 #if (CONFIG_HPS_SDR_CTRLCFG_CTRLCFG_ECCEN == 1)
 #define CONFIG_SPL_SDRAM_ECC_PADDING	32
 #endif
+
+
 
 #endif	/* __CONFIG_COMMON_H */
