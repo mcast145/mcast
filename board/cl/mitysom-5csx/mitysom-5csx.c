@@ -105,6 +105,9 @@ int board_early_init_f(void)
 	/* disable the watchdog when entering U-Boot */
 	watchdog_disable();
 #endif
+	/* calculate the clock frequencies required for drivers */
+	cm_derive_clocks_for_drivers();
+
 	return 0;
 }
 
@@ -113,12 +116,15 @@ int board_early_init_f(void)
  */
 int board_init(void)
 {
-	int rv = 0;
-
-	/* adress of boot parameters (ATAG or FDT blob) */
+	/* adress of boot parameters for ATAG (if ATAG is used) */
 	gd->bd->bi_boot_params = 0x00000100;
 
-	return rv;
+	/*
+	 * reinitialize the global variable for clock value as after
+	 * relocation, the global variable are cleared to zeroes
+	 */
+	cm_derive_clocks_for_drivers();
+	return 0;
 }
 
 int misc_init_r_ext(void)

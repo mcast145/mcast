@@ -17,7 +17,9 @@
 #ifndef __CONFIG_H
 #define __CONFIG_H
 
-#include <asm/arch/socfpga_base_addrs.h>
+#include <asm/arch/hardware.h>
+#include <asm/arch/clock_manager.h>
+
 #include "../../board/cl/mitysom-5csx/build.h"
 #include "../../board/cl/mitysom-5csx/pinmux_config.h"
 #include "../../board/cl/mitysom-5csx/pll_config.h"
@@ -33,13 +35,16 @@
 #define PRODUCT_NAME "MitySOM-5CSX"
 #define CONFIG_IDENT_STRING " " COMPANY_NAME " " PRODUCT_NAME
 
-#define CONFIG_SYS_PROMPT		"MityARM-5CSX # "
+#define CONFIG_SYS_PROMPT		"MitySOM-5CSX # "
 
 /* Need I2C support for factory config eeprom */
 #define CONFIG_CMD_I2C
+#undef CONFIG_SYS_I2C_SPEED
 #define CONFIG_SYS_I2C_SPEED                10000
 #define CONFIG_DW_I2C
+#undef CONFIG_SYS_I2C_BASE
 #define CONFIG_SYS_I2C_BASE		SOCFPGA_I2C0_ADDRESS
+#undef CONFIG_SYS_I2C_SLAVE
 #define CONFIG_SYS_I2C_SLAVE            1
 #define CONFIG_HARD_I2C
 
