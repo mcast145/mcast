@@ -43,7 +43,7 @@ DECLARE_GLOBAL_DATA_PTR;
  */
 int checkboard(void)
 {
-	puts("BOARD : Critical Link MitySOM-5CSX Module\n");
+	puts("BOARD : Critical Link MitySOM-5CSx Module\n");
 	return 0;
 }
 #ifndef NUM_EEPROM_RETRIES

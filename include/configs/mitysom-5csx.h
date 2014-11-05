@@ -32,10 +32,10 @@
 #endif
 
 #define COMPANY_NAME "Critical Link"
-#define PRODUCT_NAME "MitySOM-5CSX"
+#define PRODUCT_NAME "MitySOM-5CSx"
 #define CONFIG_IDENT_STRING " " COMPANY_NAME " " PRODUCT_NAME
 
-#define CONFIG_SYS_PROMPT		"MitySOM-5CSX # "
+#define CONFIG_SYS_PROMPT		"MitySOM-5CSx # "
 
 /* Need I2C support for factory config eeprom */
 #define CONFIG_CMD_I2C
