@@ -20,6 +20,18 @@
 #include <asm/arch/clock_manager.h>
 #include <asm/arch/debug_memory.h>
 
+#ifndef CONFIG_HPS_CLK_OSC2_HZ
+#define CONFIG_HPS_CLK_OSC2_HZ (0)
+#endif
+
+#ifndef CONFIG_HPS_CLK_F2S_SDR_REF_Hz
+#define CONFIG_HPS_CLK_F2S_SDR_REF_HZ (0)
+#endif
+
+#ifndef CONFIG_HPS_CLK_F2S_PER_REF_HZ
+#define CONFIG_HPS_CLK_F2S_PER_REF_HZ (0)
+#endif
+
 #define CLKMGR_BYPASS_ENUM_ENABLE	1
 #define CLKMGR_BYPASS_ENUM_DISABLE	0
 #define CLKMGR_STAT_BUSY_ENUM_IDLE	0x0
