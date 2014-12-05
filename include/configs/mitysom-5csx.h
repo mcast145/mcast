@@ -31,6 +31,9 @@
 #include "../../board/cl/mitysom-5csx/iocsr_config_cyclone5.h"
 #endif
 
+/* Define machine type for Cyclone 5 */
+#define CONFIG_MACH_TYPE 4251
+
 #define COMPANY_NAME "Critical Link"
 #define PRODUCT_NAME "MitySOM-5CSx"
 #define CONFIG_IDENT_STRING " " COMPANY_NAME " " PRODUCT_NAME
