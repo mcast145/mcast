@@ -53,7 +53,7 @@ unsigned long irq_cnt_ecc_sdram;
 struct pl330_transfer_struct pl330_0;
 struct pl330_transfer_struct pl330_1;
 u8 pl330_buf0[100];
-u8 pl330_buf1[1500];
+u8 pl330_buf1[2500];
 #endif
 
 /* Initialise the DRAM by telling the DRAM Size. */

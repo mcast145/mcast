@@ -399,7 +399,7 @@
  * L4 Watchdog
  */
 #define CONFIG_HW_WATCHDOG
-#define CONFIG_HW_WATCHDOG_TIMEOUT_MS	(2000)
+#define CONFIG_HW_WATCHDOG_TIMEOUT_MS	(4000)
 #define CONFIG_DESIGNWARE_WATCHDOG
 #define CONFIG_DW_WDT_BASE		SOCFPGA_L4WD0_ADDRESS
 /* Clocks source frequency to watchdog timer */
