@@ -8,7 +8,8 @@
 #define CONFIG_I2C_MAGIC_WORD	0x012C0138
 #define CONFIG_I2C_VERSION_1_1	0x00010001 /* prior to DDR3 configurations */
 #define CONFIG_I2C_VERSION_1_2	0x00010002
-#define CONFIG_I2C_VERSION	CONFIG_I2C_VERSION_1_2
+#define CONFIG_I2C_VERSION_1_3	0x00010003 /* Add MACADDR2 */
+#define CONFIG_I2C_VERSION	CONFIG_I2C_VERSION_1_3
 
 /**
  *  Model numbering scheme:
@@ -31,6 +32,15 @@
 #define RAM_SIZE_512MB_DDR3	'8'
 #define RAM_SIZE_1GB_DDR3	'A'
 
+struct I2CFactoryConfigV2 {
+	u32               ConfigMagicWord;  /** CONFIG_I2C_MAGIC_WORD */
+	u32               ConfigVersion;    /** CONFIG_I2C_VERSION */
+        u8                MACADDR[6];       /** Set to 0.. MAC is in eFuse on AM-335x */
+	u32               FpgaType;         /** fpga installed, see above */
+	u32               Spare;            /** Not Used */
+	u32               SerialNumber;     /** serial number assigned to part */
+	char              ModelNumber[32];  /** board model number, human readable text, NULL terminated */
+};
 struct I2CFactoryConfig {
 	u32               ConfigMagicWord;  /** CONFIG_I2C_MAGIC_WORD */
 	u32               ConfigVersion;    /** CONFIG_I2C_VERSION */
@@ -38,7 +48,8 @@ struct I2CFactoryConfig {
 	u32               FpgaType;         /** fpga installed, see above */
 	u32               Spare;            /** Not Used */
 	u32               SerialNumber;     /** serial number assigned to part */
-	char              ModelNumber[32];   /** board model number, human readable text, NULL terminated */
+	char              ModelNumber[32];  /** board model number, human readable text, NULL terminated */
+        u8                MACADDR2[6];      /** Set to 0.. MAC is in eFuse on AM-335x */
 };
 
 extern struct I2CFactoryConfig  factory_config_block;

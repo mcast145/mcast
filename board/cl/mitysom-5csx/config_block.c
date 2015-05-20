@@ -19,10 +19,57 @@ static struct I2CFactoryConfig default_factory_config = {
                 .MACADDR = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
 		.SerialNumber = 130001,
                 .FpgaType = 0, /* Leave FpgaType in struct to maintain compatibilty across products */
-                .ModelNumber = { '5','C','S','X','-','H','K','-','4','X','A','X','-','R','C', 0 }
+                .ModelNumber = { '5','C','S','X','-','H','K','-','4','X','A','X','-','R','C', 0 },
+                .MACADDR2 = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
 };
 
 struct I2CFactoryConfig __attribute__((section (".data"))) factory_config_block;
+
+// int i2c_read(uchar chip, uint addr, int alen, uchar *buffer, int len);
+
+/**
+ * get_factory_config_version
+ * return the version of the factory config block or 0xFFFFFFFF if invalid
+ */
+u32 get_factory_config_version(void)
+{
+	int i = 0;
+	u32 rv = 0xFFFFFFFF;
+	u32 data[2] = {0,0};
+	i = i2c_read(0x50, 0x00, 1, (unsigned char*)data, sizeof(data));
+	if (0 != i)
+	{
+		printf("ERROR %d reading Factory Configuration Version Info\n", i);
+	}
+	if(CONFIG_I2C_MAGIC_WORD == data[0])
+	{
+		rv = data[1];
+	}
+	return rv;
+}
+
+/**
+ * get_factory_config_size
+ * \return the size of the factory config block or -1 on error
+ */
+int get_factory_config_size(void)
+{
+	int rv = -1;
+	u32 version = get_factory_config_version();
+	switch(version)
+	{
+		case CONFIG_I2C_VERSION_1_1:
+		case CONFIG_I2C_VERSION_1_2:
+			rv = sizeof(struct I2CFactoryConfigV2);
+			break;
+		case CONFIG_I2C_VERSION_1_3:
+			rv = sizeof(struct I2CFactoryConfig);
+			break;
+		default:
+			break;
+	}
+	return rv;
+}
 
 int put_factory_config_block(void)
 {
@@ -73,14 +120,16 @@ int get_factory_config_block(void)
 	int i;
 	u16 sum, CheckSum;
 
-	i = i2c_read(0x50, 0x00, 1, (unsigned char*)&factory_config_block, sizeof(factory_config_block));
+	int fc_size = get_factory_config_size();
+	if(-1 != fc_size)
+		i = i2c_read(0x50, 0x00, 1, (unsigned char*)&factory_config_block, fc_size);
 	if (0 != i)
 	{
 		printf("ERROR %d reading Factory Configuration Block\n", i);
 		return -1;
 	}
 
-	i = i2c_read(0x50, sizeof(factory_config_block), 1, (unsigned char*)&CheckSum, 2);
+	i = i2c_read(0x50, fc_size, 1, (unsigned char*)&CheckSum, 2);
 	if (0 != i)
 	{
 		printf("ERROR %d reading Factory Configuration checksum\n", i);
@@ -101,6 +150,12 @@ int get_factory_config_block(void)
 		puts("You must set the factory configuration to make permanent\n");
 		memcpy(&factory_config_block, &default_factory_config, sizeof(factory_config_block));
 		return 1;
+	}
+	if(factory_config_block.ConfigVersion != CONFIG_I2C_VERSION)
+	{
+		printf("Factory config block version mismatch (read %08x vs %08x)\n",
+		       factory_config_block.ConfigVersion , CONFIG_I2C_VERSION);
+		puts("You should [re]run factoryconfig set to update\n");
 	}
 	return 0;
 }
@@ -139,7 +194,7 @@ void get_board_serial(struct tag_serialnr *sn)
  * Set the factory config block mac address from an ascii string
  * of the form xx:xx:xx:xx:xx:xx
  */
-static void set_mac_from_string(char *buffer)
+static void set_mac_from_string(u8* mac,char *buffer)
 {
 	char *p = buffer;
 	int i=0;
@@ -152,7 +207,7 @@ static void set_mac_from_string(char *buffer)
 			p[j] = 0;
 			t = simple_strtoul(p, NULL, 16);
 			p[j] = temp;
-			factory_config_block.MACADDR[i] = t&0xFF;
+			mac[i] = t&0xFF;
 		}
 		p = &p[j];
 		if (*p) p++;
@@ -180,6 +235,13 @@ static int do_factoryconfig (cmd_tbl_t * cmdtp, int flag, int argc, char *argv[]
                                         factory_config_block.MACADDR[3],
                                         factory_config_block.MACADDR[4],
                                         factory_config_block.MACADDR[5]);
+                        printf("MAC Address2   : %02X:%02X:%02X:%02X:%02X:%02X\n",
+                                        factory_config_block.MACADDR2[0],
+                                        factory_config_block.MACADDR2[1],
+                                        factory_config_block.MACADDR2[2],
+                                        factory_config_block.MACADDR2[3],
+                                        factory_config_block.MACADDR2[4],
+                                        factory_config_block.MACADDR2[5]);
 
 			printf("Serial Number  : %d\n",
 				factory_config_block.SerialNumber);
@@ -195,8 +257,18 @@ static int do_factoryconfig (cmd_tbl_t * cmdtp, int flag, int argc, char *argv[]
                                         factory_config_block.MACADDR[3],
                                         factory_config_block.MACADDR[4],
                                         factory_config_block.MACADDR[5]);
-                        readline_into_buffer ("MAC Address   : ", buffer, 0);
-			set_mac_from_string(buffer);
+                        readline_into_buffer ("MAC Address(1): ", buffer, 0);
+			set_mac_from_string(factory_config_block.MACADDR,buffer);
+                        sprintf(buffer, "%02X:%02X:%02X:%02X:%02X:%02X",
+                                        factory_config_block.MACADDR2[0],
+                                        factory_config_block.MACADDR2[1],
+                                        factory_config_block.MACADDR2[2],
+                                        factory_config_block.MACADDR2[3],
+                                        factory_config_block.MACADDR2[4],
+                                        factory_config_block.MACADDR2[5]);
+                        readline_into_buffer ("MAC Address(2): ", buffer, 0);
+			set_mac_from_string(factory_config_block.MACADDR2,buffer);
+
 			sprintf(buffer, "%d", factory_config_block.SerialNumber);
 			readline_into_buffer ("Serial Number :", buffer, 0);
 			i = atoi(buffer);
@@ -225,8 +297,11 @@ static int do_factoryconfig (cmd_tbl_t * cmdtp, int flag, int argc, char *argv[]
 				k = strsep(&v, "=");
 				if (!k)
 					break;
-				if  (strncmp(k, "mac",3) == 0) {
-					set_mac_from_string(v);
+				// do mac2 first, otherwise "mac2" passes check for "mac"
+				if  (strncmp(k, "mac2",4) == 0) {
+					set_mac_from_string(factory_config_block.MACADDR2,v);
+				} else if  (strncmp(k, "mac",3) == 0) {
+					set_mac_from_string(factory_config_block.MACADDR,v);
 				} else if  (strncmp(k, "sn",2) == 0) {
 					i = atoi(v);
 					if (i > 0) factory_config_block.SerialNumber = i;
@@ -267,7 +342,7 @@ U_BOOT_CMD(factoryconfig,	CONFIG_SYS_MAXARGS,	0,	do_factoryconfig,
 	"         - set new configuration (interactive)\n"
 	"factoryconfig fix\n"
 	"         - set new configuration and save with one line\n"
-	"           mac=xx:xx:xx:xx:xx:xx,sn=nnnnn,mn=sss...sss\n"
+	"           mac=xx:xx:xx:xx:xx:xx,mac2=xx:xx:xx:xx:xx:xx,sn=nnnnn,mn=sss...sss\n"
 	"factoryconfig save\n"
 	"         - write new configuration to I2C FLASH\n"
 );
