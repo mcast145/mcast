@@ -155,6 +155,9 @@ void i2c_init(int speed, int slaveadd)
 	writel(enbl, &i2c_regs_p->ic_enable);
 
 #ifdef CONFIG_I2C_MULTI_BUS
+	if(current_bus < 0 || current_bus >= CONFIG_SYS_I2C_BUS_MAX)
+		current_bus = 0;
+
 	bus_initialized[current_bus] = 1;
 #endif
 }
