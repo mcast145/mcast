@@ -131,12 +131,14 @@ int misc_init_r_ext(void)
 {
 	int rv = 0;
 	uint8_t eth_addr[10];
+	uint8_t eth1addr[10];
 
 	rv = read_eeprom();
 	if ( 0 != rv) {
 		memset(&factory_config_block, '\0', sizeof(factory_config_block));
 	}
 
+		/* Handle setting the first MAC to ethaddr env varible */
         memcpy(eth_addr,factory_config_block.MACADDR, 6);
 
         if(is_valid_ether_addr(eth_addr)) {
@@ -147,6 +149,18 @@ int misc_init_r_ext(void)
 
 		if(!env_ethaddr || (0 != strncmp(tmp, env_ethaddr,18)))
 			setenv("ethaddr", (char *)tmp);
+        }
+
+		/* Handle setting the second MAC to eth1addr env varible */
+        memcpy(eth1addr,factory_config_block.MACADDR2, 6);
+        if(is_valid_ether_addr(eth1addr)) {
+		char tmp[24];
+		char* env_ethaddr1 = getenv("eth1addr");
+                sprintf((char *)tmp, "%02x:%02x:%02x:%02x:%02x:%02x", eth1addr[0],
+                        eth1addr[1], eth1addr[2], eth1addr[3], eth1addr[4], eth1addr[5]);
+
+		if(!env_ethaddr1 || (0 != strncmp(tmp, env_ethaddr1,18)))
+			setenv("eth1addr", (char *)tmp);
         }
 
 	return rv;
