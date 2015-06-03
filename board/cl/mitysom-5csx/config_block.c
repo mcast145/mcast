@@ -219,8 +219,10 @@ static void set_mac_from_string(u8* mac,char *buffer)
 static int do_factoryconfig (cmd_tbl_t * cmdtp, int flag, int argc, char *argv[])
 {
 	int ret = CMD_RET_FAILURE;
-	char buffer[80];
+	char *buffer = (char*)malloc(80 * sizeof(char));
 	char *strcopy = NULL;
+
+	printf("Factory config at %p [ %d bytes]\n",&factory_config_block,sizeof(factory_config_block));
 
 	if (argc == 1) {
 		/* List configuration info */
@@ -228,20 +230,20 @@ static int do_factoryconfig (cmd_tbl_t * cmdtp, int flag, int argc, char *argv[]
 			printf("Config Version : %d.%d\n",
 				factory_config_block.ConfigVersion>>16,
 				factory_config_block.ConfigVersion&0xFFFF);
-                        printf("MAC Address    : %02X:%02X:%02X:%02X:%02X:%02X\n",
-                                        factory_config_block.MACADDR[0],
-                                        factory_config_block.MACADDR[1],
-                                        factory_config_block.MACADDR[2],
-                                        factory_config_block.MACADDR[3],
-                                        factory_config_block.MACADDR[4],
-                                        factory_config_block.MACADDR[5]);
-                        printf("MAC Address2   : %02X:%02X:%02X:%02X:%02X:%02X\n",
-                                        factory_config_block.MACADDR2[0],
-                                        factory_config_block.MACADDR2[1],
-                                        factory_config_block.MACADDR2[2],
-                                        factory_config_block.MACADDR2[3],
-                                        factory_config_block.MACADDR2[4],
-                                        factory_config_block.MACADDR2[5]);
+			printf("MAC Address    : %02X:%02X:%02X:%02X:%02X:%02X\n",
+					factory_config_block.MACADDR[0],
+					factory_config_block.MACADDR[1],
+					factory_config_block.MACADDR[2],
+					factory_config_block.MACADDR[3],
+					factory_config_block.MACADDR[4],
+					factory_config_block.MACADDR[5]);
+			printf("MAC Address2   : %02X:%02X:%02X:%02X:%02X:%02X\n",
+					factory_config_block.MACADDR2[0],
+					factory_config_block.MACADDR2[1],
+					factory_config_block.MACADDR2[2],
+					factory_config_block.MACADDR2[3],
+					factory_config_block.MACADDR2[4],
+					factory_config_block.MACADDR2[5]);
 
 			printf("Serial Number  : %d\n",
 				factory_config_block.SerialNumber);
@@ -250,35 +252,46 @@ static int do_factoryconfig (cmd_tbl_t * cmdtp, int flag, int argc, char *argv[]
 	} else {
 		unsigned int i;
 		if (0 == strncmp(argv[1],"set",3)) {
-                        sprintf(buffer, "%02X:%02X:%02X:%02X:%02X:%02X",
-                                        factory_config_block.MACADDR[0],
-                                        factory_config_block.MACADDR[1],
-                                        factory_config_block.MACADDR[2],
-                                        factory_config_block.MACADDR[3],
-                                        factory_config_block.MACADDR[4],
-                                        factory_config_block.MACADDR[5]);
-                        readline_into_buffer ("MAC Address(1): ", buffer, 0);
+			sprintf(buffer, "%02X:%02X:%02X:%02X:%02X:%02X",
+					factory_config_block.MACADDR[0],
+					factory_config_block.MACADDR[1],
+					factory_config_block.MACADDR[2],
+					factory_config_block.MACADDR[3],
+					factory_config_block.MACADDR[4],
+					factory_config_block.MACADDR[5]);
+			readline_into_buffer ("MAC Address(1): ", buffer, 0);
+			if((strlen(buffer) == 1) && ('.' == buffer[0]))
+				goto done;
 			set_mac_from_string(factory_config_block.MACADDR,buffer);
-                        sprintf(buffer, "%02X:%02X:%02X:%02X:%02X:%02X",
-                                        factory_config_block.MACADDR2[0],
-                                        factory_config_block.MACADDR2[1],
-                                        factory_config_block.MACADDR2[2],
-                                        factory_config_block.MACADDR2[3],
-                                        factory_config_block.MACADDR2[4],
-                                        factory_config_block.MACADDR2[5]);
-                        readline_into_buffer ("MAC Address(2): ", buffer, 0);
+
+			sprintf(buffer, "%02X:%02X:%02X:%02X:%02X:%02X",
+					factory_config_block.MACADDR2[0],
+					factory_config_block.MACADDR2[1],
+					factory_config_block.MACADDR2[2],
+					factory_config_block.MACADDR2[3],
+					factory_config_block.MACADDR2[4],
+					factory_config_block.MACADDR2[5]);
+			readline_into_buffer ("MAC Address(2): ", buffer, 0);
+			if((strlen(buffer) == 1) && ('.' == buffer[0]))
+				goto done;                        
 			set_mac_from_string(factory_config_block.MACADDR2,buffer);
 
 			sprintf(buffer, "%d", factory_config_block.SerialNumber);
 			readline_into_buffer ("Serial Number :", buffer, 0);
+			if((strlen(buffer) == 1) && ('.' == buffer[0]))
+				goto done;
 			i = atoi(buffer);
 			if (i > 0) factory_config_block.SerialNumber = i;
+
 			sprintf(buffer, "%s", factory_config_block.ModelNumber);
 			readline_into_buffer ("Model Number  :", buffer, 0);
-			memcpy(factory_config_block.ModelNumber, buffer,
-				sizeof(factory_config_block.ModelNumber));
-			factory_config_block.ModelNumber
-				[sizeof(factory_config_block.ModelNumber)-1] = 0;
+			if((strlen(buffer) == 1) && ('.' == buffer[0]))
+				goto done;
+			buffer[31] = '\0';
+			strncpy(factory_config_block.ModelNumber, buffer, 32);
+			/* make sure it is null terminated */
+			factory_config_block.ModelNumber[31] = '\0';
+
 		} else if (0 == strncmp(argv[1],"fix",3) && argv[2]) {
 			/* Fix is so you can spec the whole config in a line */
 			char *s;
@@ -309,7 +322,7 @@ static int do_factoryconfig (cmd_tbl_t * cmdtp, int flag, int argc, char *argv[]
 					strncpy(factory_config_block.ModelNumber, v,
 							sizeof(factory_config_block.ModelNumber));
 					factory_config_block.ModelNumber
-						[sizeof(factory_config_block.ModelNumber)-1] = 0;
+						[sizeof(factory_config_block.ModelNumber)-1] = '\0';
 				} else {
 					printf("Unknown key %s\n",k);
 					goto done;
@@ -330,6 +343,7 @@ static int do_factoryconfig (cmd_tbl_t * cmdtp, int flag, int argc, char *argv[]
 	}
 	ret = CMD_RET_SUCCESS;
 done:
+	free(buffer);
 	if(strcopy)
 		free(strcopy);
 	return ret;
