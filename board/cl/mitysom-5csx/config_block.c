@@ -23,7 +23,7 @@ static struct I2CFactoryConfig default_factory_config = {
                 .MACADDR2 = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
 };
 
-struct I2CFactoryConfig __attribute__((section (".data"))) factory_config_block;
+struct I2CFactoryConfig factory_config_block;
 
 // int i2c_read(uchar chip, uint addr, int alen, uchar *buffer, int len);
 
