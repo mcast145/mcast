@@ -14,13 +14,13 @@
 #include <i2c.h>
 
 static struct I2CFactoryConfig default_factory_config = {
-		.ConfigMagicWord = CONFIG_I2C_MAGIC_WORD,
-		.ConfigVersion = CONFIG_I2C_VERSION,
-                .MACADDR = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
-		.SerialNumber = 130001,
-                .FpgaType = 0, /* Leave FpgaType in struct to maintain compatibilty across products */
-                .ModelNumber = { '5','C','S','X','-','H','K','-','4','X','A','X','-','R','C', 0 },
-                .MACADDR2 = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
+	.ConfigMagicWord = CONFIG_I2C_MAGIC_WORD,
+	.ConfigVersion = CONFIG_I2C_VERSION,
+	.MACADDR = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
+	.SerialNumber = 130001,
+	.FpgaType = 0, /* Leave FpgaType in struct to maintain compatibilty across products */
+	.ModelNumber = { '5','C','S','X','-','H','K','-','4','X','A','X','-','R','C', 0 },
+	.MACADDR2 = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
 };
 
 struct I2CFactoryConfig factory_config_block;
@@ -154,7 +154,7 @@ int get_factory_config_block(void)
 	if(factory_config_block.ConfigVersion != CONFIG_I2C_VERSION)
 	{
 		printf("Factory config block version mismatch (read %08x vs %08x)\n",
-		       factory_config_block.ConfigVersion , CONFIG_I2C_VERSION);
+				factory_config_block.ConfigVersion , CONFIG_I2C_VERSION);
 		puts("You should [re]run factoryconfig set to update\n");
 	}
 	return 0;
@@ -163,25 +163,25 @@ int get_factory_config_block(void)
 /* This is a trivial atoi implementation since we don't have one available */
 int atoi(char *string)
 {
-        int length;
-        int retval = 0;
-        int i;
-        int sign = 1;
+	int length;
+	int retval = 0;
+	int i;
+	int sign = 1;
 
-        length = strlen(string);
-        for (i = 0; i < length; i++) {
-                if (0 == i && string[0] == '-') {
-                        sign = -1;
-                        continue;
-                }
-                if (string[i] > '9' || string[i] < '0') {
-                        break;
-                }
-                retval *= 10;
-                retval += string[i] - '0';
-        }
-        retval *= sign;
-        return retval;
+	length = strlen(string);
+	for (i = 0; i < length; i++) {
+		if (0 == i && string[0] == '-') {
+			sign = -1;
+			continue;
+		}
+		if (string[i] > '9' || string[i] < '0') {
+			break;
+		}
+		retval *= 10;
+		retval += string[i] - '0';
+	}
+	retval *= sign;
+	return retval;
 }
 
 void get_board_serial(struct tag_serialnr *sn)
@@ -226,28 +226,28 @@ static int do_factoryconfig (cmd_tbl_t * cmdtp, int flag, int argc, char *argv[]
 
 	if (argc == 1) {
 		/* List configuration info */
-			puts ("Factory Configuration:\n");
-			printf("Config Version : %d.%d\n",
+		puts ("Factory Configuration:\n");
+		printf("Config Version : %d.%d\n",
 				factory_config_block.ConfigVersion>>16,
 				factory_config_block.ConfigVersion&0xFFFF);
-			printf("MAC Address    : %02X:%02X:%02X:%02X:%02X:%02X\n",
-					factory_config_block.MACADDR[0],
-					factory_config_block.MACADDR[1],
-					factory_config_block.MACADDR[2],
-					factory_config_block.MACADDR[3],
-					factory_config_block.MACADDR[4],
-					factory_config_block.MACADDR[5]);
-			printf("MAC Address2   : %02X:%02X:%02X:%02X:%02X:%02X\n",
-					factory_config_block.MACADDR2[0],
-					factory_config_block.MACADDR2[1],
-					factory_config_block.MACADDR2[2],
-					factory_config_block.MACADDR2[3],
-					factory_config_block.MACADDR2[4],
-					factory_config_block.MACADDR2[5]);
+		printf("MAC Address    : %02X:%02X:%02X:%02X:%02X:%02X\n",
+				factory_config_block.MACADDR[0],
+				factory_config_block.MACADDR[1],
+				factory_config_block.MACADDR[2],
+				factory_config_block.MACADDR[3],
+				factory_config_block.MACADDR[4],
+				factory_config_block.MACADDR[5]);
+		printf("MAC Address2   : %02X:%02X:%02X:%02X:%02X:%02X\n",
+				factory_config_block.MACADDR2[0],
+				factory_config_block.MACADDR2[1],
+				factory_config_block.MACADDR2[2],
+				factory_config_block.MACADDR2[3],
+				factory_config_block.MACADDR2[4],
+				factory_config_block.MACADDR2[5]);
 
-			printf("Serial Number  : %d\n",
+		printf("Serial Number  : %d\n",
 				factory_config_block.SerialNumber);
-			printf("Model Number   : %s\n",
+		printf("Model Number   : %s\n",
 				factory_config_block.ModelNumber);
 	} else {
 		unsigned int i;
@@ -350,15 +350,15 @@ done:
 }
 
 U_BOOT_CMD(factoryconfig,	CONFIG_SYS_MAXARGS,	0,	do_factoryconfig,
-        "mitysom-5csx factory config block operations",
-	     "    - print current configuration\n"
-	"factoryconfig set\n"
-	"         - set new configuration (interactive)\n"
-	"factoryconfig fix\n"
-	"         - set new configuration and save with one line\n"
-	"           mac=xx:xx:xx:xx:xx:xx,mac2=xx:xx:xx:xx:xx:xx,sn=nnnnn,mn=sss...sss\n"
-	"factoryconfig save\n"
-	"         - write new configuration to I2C FLASH\n"
-);
+		"mitysom-5csx factory config block operations",
+		"    - print current configuration\n"
+		"factoryconfig set\n"
+		"         - set new configuration (interactive)\n"
+		"factoryconfig fix\n"
+		"         - set new configuration and save with one line\n"
+		"           mac=xx:xx:xx:xx:xx:xx,mac2=xx:xx:xx:xx:xx:xx,sn=nnnnn,mn=sss...sss\n"
+		"factoryconfig save\n"
+		"         - write new configuration to I2C FLASH\n"
+		);
 
 #endif // CONFIG_SPL_BUILD

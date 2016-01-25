@@ -35,7 +35,7 @@
 struct I2CFactoryConfigV2 {
 	u32               ConfigMagicWord;  /** CONFIG_I2C_MAGIC_WORD */
 	u32               ConfigVersion;    /** CONFIG_I2C_VERSION */
-        u8                MACADDR[6];       /** Set to 0.. MAC is in eFuse on AM-335x */
+	u8                MACADDR[6];       /** Set to 0.. MAC is in eFuse on AM-335x */
 	u32               FpgaType;         /** fpga installed, see above */
 	u32               Spare;            /** Not Used */
 	u32               SerialNumber;     /** serial number assigned to part */
@@ -44,12 +44,12 @@ struct I2CFactoryConfigV2 {
 struct I2CFactoryConfig {
 	u32               ConfigMagicWord;  /** CONFIG_I2C_MAGIC_WORD */
 	u32               ConfigVersion;    /** CONFIG_I2C_VERSION */
-        u8                MACADDR[6];       /** Set to 0.. MAC is in eFuse on AM-335x */
+	u8                MACADDR[6];       /** Set to 0.. MAC is in eFuse on AM-335x */
 	u32               FpgaType;         /** fpga installed, see above */
 	u32               Spare;            /** Not Used */
 	u32               SerialNumber;     /** serial number assigned to part */
 	char              ModelNumber[32];  /** board model number, human readable text, NULL terminated */
-        u8                MACADDR2[6];      /** Set to 0.. MAC is in eFuse on AM-335x */
+	u8                MACADDR2[6];      /** Set to 0.. MAC is in eFuse on AM-335x */
 };
 
 extern struct I2CFactoryConfig  factory_config_block;
