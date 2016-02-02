@@ -291,47 +291,6 @@ static int do_factoryconfig (cmd_tbl_t * cmdtp, int flag, int argc, char *argv[]
 			strncpy(factory_config_block.ModelNumber, buffer, 32);
 			/* make sure it is null terminated */
 			factory_config_block.ModelNumber[31] = '\0';
-
-		} else if (0 == strncmp(argv[1],"fix",3) && argv[2]) {
-			/* Fix is so you can spec the whole config in a line */
-			char *s;
-			char *v, *k;
-			strcopy = strdup(argv[2]);
-			if (strcopy == NULL) {
-				printf("error %d in strdup\n", errno);
-				goto done;
-			}
-
-			s = strcopy;
-			while (s) {
-				v = strsep(&s, ",");
-				if (!v)
-					break;
-				k = strsep(&v, "=");
-				if (!k)
-					break;
-				// do mac2 first, otherwise "mac2" passes check for "mac"
-				if  (strncmp(k, "mac2",4) == 0) {
-					set_mac_from_string(factory_config_block.MACADDR2,v);
-				} else if  (strncmp(k, "mac",3) == 0) {
-					set_mac_from_string(factory_config_block.MACADDR,v);
-				} else if  (strncmp(k, "sn",2) == 0) {
-					i = atoi(v);
-					if (i > 0) factory_config_block.SerialNumber = i;
-				} else if  (strncmp(k, "mn",3) == 0) {
-					strncpy(factory_config_block.ModelNumber, v,
-							sizeof(factory_config_block.ModelNumber));
-					factory_config_block.ModelNumber
-						[sizeof(factory_config_block.ModelNumber)-1] = '\0';
-				} else {
-					printf("Unknown key %s\n",k);
-					goto done;
-				}
-			}
-
-			put_factory_config_block();
-			puts("Configuration Saved\n");
-
 		} else if (0 == strncmp(argv[1],"save",4)) {
 			put_factory_config_block();
 			puts("Configuration Saved\n");
@@ -354,9 +313,6 @@ U_BOOT_CMD(factoryconfig,	CONFIG_SYS_MAXARGS,	0,	do_factoryconfig,
 		"    - print current configuration\n"
 		"factoryconfig set\n"
 		"         - set new configuration (interactive)\n"
-		"factoryconfig fix\n"
-		"         - set new configuration and save with one line\n"
-		"           mac=xx:xx:xx:xx:xx:xx,mac2=xx:xx:xx:xx:xx:xx,sn=nnnnn,mn=sss...sss\n"
 		"factoryconfig save\n"
 		"         - write new configuration to I2C FLASH\n"
 		);
