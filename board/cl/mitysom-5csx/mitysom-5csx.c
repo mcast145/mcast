@@ -134,9 +134,6 @@ int misc_init_r_ext(void)
 	uint8_t eth1addr[10];
 
 	rv = read_eeprom();
-	if ( 0 != rv) {
-		memset(&factory_config_block, '\0', sizeof(factory_config_block));
-	}
 
 		/* Handle setting the first MAC to ethaddr env varible */
         memcpy(eth_addr,factory_config_block.MACADDR, 6);
@@ -151,8 +148,9 @@ int misc_init_r_ext(void)
 			setenv("ethaddr", (char *)tmp);
         }
 
+		MacAddressBlock *mac2 = get_2nd_mac_address();
 		/* Handle setting the second MAC to eth1addr env varible */
-        memcpy(eth1addr,factory_config_block.MACADDR2, 6);
+        memcpy(eth1addr,mac2->MacAddress, 6);
         if(is_valid_ether_addr(eth1addr)) {
 		char tmp[24];
 		char* env_ethaddr1 = getenv("eth1addr");

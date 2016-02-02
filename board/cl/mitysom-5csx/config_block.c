@@ -12,20 +12,151 @@
 #include <asm/io.h>
 #include <asm/errno.h>
 #include <i2c.h>
+#include <stdarg.h>
+
+#define EEPROM_ADDRESS (0x50)
+#define EEPROM_SIZE_BYTES 2048
 
 static struct I2CFactoryConfig default_factory_config = {
 	.ConfigMagicWord = CONFIG_I2C_MAGIC_WORD,
 	.ConfigVersion = CONFIG_I2C_VERSION,
 	.MACADDR = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
-	.SerialNumber = 130001,
+	.SerialNumber = 0,
 	.FpgaType = 0, /* Leave FpgaType in struct to maintain compatibilty across products */
-	.ModelNumber = { '5','C','S','X','-','H','K','-','4','X','A','X','-','R','C', 0 },
-	.MACADDR2 = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
+	.ModelNumber = { '\0' }
+};
+
+static struct MacAddressBlock default_2nd_mac_config = {
+	.MacAddress = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }
 };
 
 struct I2CFactoryConfig factory_config_block;
+struct GenericDataBlock *generic_data_block = NULL;
 
-// int i2c_read(uchar chip, uint addr, int alen, uchar *buffer, int len);
+typedef enum PrintType { eeInfo, eeDebug, eeWarning, eeError } PrintType;
+void print_console(PrintType type, const char *str, ...)
+{
+	switch(type)
+	{
+		case eeInfo:
+			printf( "Info - ");
+			break;
+		case eeWarning:
+			printf("Warning - ");
+			break;
+		case eeError:
+			printf("Error - ");
+			break;
+		case eeDebug:
+#ifdef DEBUG
+			printf("Debug - ");
+#else
+			return;
+#endif
+			break;
+		default:
+			printf("Unknown - ");
+	}
+
+	va_list args;
+	va_start(args, str);
+	vprintf(str, args);
+	printf("\n");
+	va_end(args);
+}
+
+struct GenericDataBlock* create_generic_block(u16 type, u16 size, uchar *data)
+{
+	GenericDataBlock *block = malloc(sizeof(GenericDataBlock));
+	if(block != NULL)
+	{
+		block->Header.MagicWord = CONFIG_I2C_MAGIC_WORD;
+		block->Header.Type = type;
+		block->Header.Size = size;
+		block->Data = (uchar*)malloc(size);
+		if(block->Data == NULL)
+		{
+			free(block);
+			return NULL;
+		}
+		memcpy(block->Data, data, size);
+		block->Next = NULL;
+				
+		print_console(eeDebug, "Create Gen Block|Type: %d, Size: %d", block->Header.Type, block->Header.Size);
+	}
+
+	return block;
+}
+
+void add_generic_block(struct GenericDataBlock* block)
+{
+	GenericDataBlock* node;
+
+	if(generic_data_block == NULL)
+	{
+		/* No blocks in our list, this will be the first */
+		print_console(eeDebug, "Block list empty, adding node(%04X) to head", block->Header.Type);
+		generic_data_block = block;
+	}
+	else
+	{
+		/* Go search for the end of the list */
+		node = generic_data_block;
+		while(node->Next != NULL)
+		{
+			node = node->Next;
+		}
+
+		/* End of the list, point to the new block */
+		node->Next = block;
+		print_console(eeDebug, "Adding node(%04X) to end of block list", block->Header.Type);
+	}
+}
+
+GenericDataBlock* get_generic_block(GenericType type)
+{
+	GenericDataBlock* node = generic_data_block;
+
+	while(node != NULL)
+	{
+		print_console(eeDebug, "Search Gen Block|Type: %d, Size: %d", node->Header.Type, node->Header.Size);
+		if(node->Header.Type == type)
+		{
+			print_console(eeDebug, "Found generic block(%04X)", node->Header.Type);
+			return node;
+		}
+
+		node = node->Next;
+	}
+
+	return NULL;
+}
+
+MacAddressBlock* get_2nd_mac_address(void)
+{
+	GenericDataBlock *block = get_generic_block(ee2ndMAC);
+	MacAddressBlock *mac = NULL; 
+	if(block == NULL)
+	{
+		print_console(eeDebug, "No 2nd MAC address in list, loading defaults");
+		/* No 2nd mac address in list, so make one with defaults */
+		block = create_generic_block(ee2ndMAC, 
+				sizeof(MacAddressBlock), (uchar*)&default_2nd_mac_config);
+		if(block != NULL)
+		{
+			print_console(eeDebug, "Adding default 2nd mac to list");
+			add_generic_block(block);
+			mac = (MacAddressBlock*)block->Data;
+		}
+	}
+	else
+	{
+		print_console(eeDebug, "Found 2nd MAC, returning");
+		mac = (MacAddressBlock*)block->Data;
+	}
+	return mac;
+}
+
 
 /**
  * get_factory_config_version
@@ -36,10 +167,10 @@ u32 get_factory_config_version(void)
 	int i = 0;
 	u32 rv = 0xFFFFFFFF;
 	u32 data[2] = {0,0};
-	i = i2c_read(0x50, 0x00, 1, (unsigned char*)data, sizeof(data));
+	i = i2c_read(EEPROM_ADDRESS, 0x00, 1, (uchar*)data, sizeof(data));
 	if (0 != i)
 	{
-		printf("ERROR %d reading Factory Configuration Version Info\n", i);
+		print_console(eeError, "Failure reading Factory Configuration Version Info");
 	}
 	if(CONFIG_I2C_MAGIC_WORD == data[0])
 	{
@@ -60,10 +191,10 @@ int get_factory_config_size(void)
 	{
 		case CONFIG_I2C_VERSION_1_1:
 		case CONFIG_I2C_VERSION_1_2:
-			rv = sizeof(struct I2CFactoryConfigV2);
+			rv = sizeof(struct I2CFactoryConfig);
 			break;
 		case CONFIG_I2C_VERSION_1_3:
-			rv = sizeof(struct I2CFactoryConfig);
+			rv = sizeof(struct I2CFactoryConfigV3);
 			break;
 		default:
 			break;
@@ -71,93 +202,345 @@ int get_factory_config_size(void)
 	return rv;
 }
 
-int put_factory_config_block(void)
+u32 calc_checksum(uchar* data, u16 size)
 {
-	int i, ret;
-	u16 sum = 0;
-	unsigned char* tmp;
-	unsigned int addr = 0x00;
+	u32 sum = 0;
+	int i;
 
-	factory_config_block.ConfigMagicWord = CONFIG_I2C_MAGIC_WORD;
-	factory_config_block.ConfigVersion = CONFIG_I2C_VERSION;
-	tmp = (unsigned char*)&factory_config_block;
-
-	for (i = 0; i < sizeof(factory_config_block); i++)
+	for (i = 0; i < size; i++)
 	{
-		sum += *tmp++;
+		sum += *data++;
 	}
 
-	tmp = (unsigned char*)&factory_config_block;
-	ret = 0;
-	for (i = 0; i < sizeof(factory_config_block); i++)
+	return sum;
+}
+
+int put_generic_data_block(GenericDataBlock* node, int addr)
+{
+	/* Write out header */
+	int i = 0;
+	int offset = 0;
+	int ret = 0;
+
+	uchar *tmp = (uchar*)&node->Header;
+	for(i = 0; i < sizeof(GenericDataBlockHeader); i++)
 	{
-		ret |= i2c_write(0x50, addr++, 1, tmp++, 1);
+		ret |= i2c_write(EEPROM_ADDRESS, addr+(offset++), 1, tmp++, 1);
+		udelay(11000);
+	}
+	/* Write out Data */
+	tmp = (uchar*)node->Data;
+	for(i = 0; i < node->Header.Size; i++)
+	{
+		ret |= i2c_write(EEPROM_ADDRESS, addr+(offset++), 1, tmp++, 1);
+		udelay(11000);
+	}
+	/* Calc/writeout checksum */
+	u32 sumHeader = calc_checksum((uchar*)&node->Header, sizeof(GenericDataBlockHeader));
+	u32 sumData = calc_checksum((uchar*)node->Data, node->Header.Size);
+	u32 sumGen = sumHeader + sumData;
+	tmp = (uchar*)&sumGen;
+	for(i = 0; i < sizeof(u32); i++)
+	{
+		ret |= i2c_write(EEPROM_ADDRESS, addr+(offset++), 1, tmp++, 1);
 		udelay(11000);
 	}
 
-	tmp = (unsigned char*)&sum;
-	for (i = 0; i < 2; i++)
+	if(ret != 0)
+		offset = 0;
+
+	return offset;
+}
+
+int put_factory_config_block(void)
+{
+	int i, ret;
+	uchar* tmp;
+	unsigned int addr = 0x00;
+
+	/* Set the magic word/version */
+	factory_config_block.ConfigMagicWord = CONFIG_I2C_MAGIC_WORD;
+	factory_config_block.ConfigVersion = CONFIG_I2C_VERSION;
+
+	/* Write out factory config */
+	tmp = (uchar*)&factory_config_block;
+	ret = 0;
+	for (i = 0; i < sizeof(factory_config_block); i++)
 	{
-		ret |= i2c_write(0x50, addr++, 1, tmp++, 1);
+		ret |= i2c_write(EEPROM_ADDRESS, addr++, 1, tmp++, 1);
+		udelay(11000);
+	}
+
+	/* Calculate and writeout the factory config block check sum */
+	u16 fcSum = calc_checksum((uchar*)&factory_config_block, sizeof(struct I2CFactoryConfig));
+	tmp = (uchar*)&fcSum;
+	for (i = 0; i < sizeof(u16); i++)
+	{
+		ret |= i2c_write(EEPROM_ADDRESS, addr++, 1, tmp++, 1);
+		udelay(11000);
+	}
+
+	/* Add the 2nd MAC address */
+	GenericDataBlock* block = get_generic_block(ee2ndMAC);
+	if(block == NULL)
+	{
+		/* No 2nd mac found, add defaults */
+		block = create_generic_block(ee2ndMAC, sizeof(MacAddressBlock), (uchar*)&default_2nd_mac_config);
+		if(block != NULL)
+		{
+			add_generic_block(block);
+			return 1;
+		}
+	}
+	addr += put_generic_data_block(block, addr);
+
+	/* Blank out the next 4 bytes in EEPROM, so there will be no false magic word readings */
+	for(i = 0; i < sizeof(u32); i++)
+	{
+		ret |= i2c_write(EEPROM_ADDRESS, addr++, 1, 0, 1);
 		udelay(11000);
 	}
 
 	if (ret) {
-		puts("Error Writing Factory Configuration Block\n");
+		print_console(eeError, "Error Writing Factory Configuration Block");
 	}
 	else {
-		puts("Factory Configuration Block Saved\n");
+		print_console(eeInfo, "Factory Configuration Block Saved"); 
 	}
 	return ret;
 }
 
+
+int is_known_generic_type(int type)
+{
+	switch(type)
+	{
+		case ee2ndMAC:
+			return 1;
+	}
+
+	return 0;
+}
+
+typedef enum ParseStatus 
+{
+	eeSuccess, 
+	eeNoMagicWord, 
+	eeUnknownConfig, 
+	eeI2CError, 
+	eeBadChecksum, 
+	eeMallocError, 
+	eeBadGenBlock
+} ParseStatus;
+ParseStatus parse_factory_config(void)
+{
+	int status;
+	u16 calcSum, readSum;
+	uchar buffer[sizeof(struct I2CFactoryConfigV3)];
+	int configSize;
+
+	/* Grab the base config size */
+	configSize = get_factory_config_size();
+	if(configSize == -1)
+	{
+		print_console(eeDebug, "Couldn't figure out config size");
+		return eeUnknownConfig;
+	}
+
+	/* Read data from eeprom */
+	status = i2c_read(EEPROM_ADDRESS, 0x00, 1, buffer, configSize);
+	if(status != 0)
+		return eeI2CError;
+
+	/* Check Magic Word */
+	struct I2CFactoryConfig *config = (struct I2CFactoryConfig*)buffer;
+	if(config->ConfigMagicWord != CONFIG_I2C_MAGIC_WORD)
+	{
+		print_console(eeDebug, "No magic word found for factoryconfig");
+		return eeNoMagicWord;
+	}
+
+	/* Read base config checksum */
+	status = i2c_read(EEPROM_ADDRESS, configSize, 1, (uchar*)&readSum, sizeof(u16));
+	if(status != 0)
+		return eeI2CError;
+
+	/* Calculate the checksum of the config we just read */
+	calcSum = calc_checksum(buffer, configSize);
+
+	/* Check if the calculated checksum vs stored */
+	if(calcSum != readSum)
+	{
+		print_console(eeDebug, "factoryconfig checksum didn't match, Expected: %04X Actual: %04X", readSum, calcSum);
+		return eeBadChecksum;
+	}
+
+	/* Set the factory config block */
+	memcpy(&factory_config_block, buffer, sizeof(struct I2CFactoryConfig));
+
+	/* If this is a config 1.3 block, convert the 2nd MAC address to a generic block */
+	if(factory_config_block.ConfigVersion == CONFIG_I2C_VERSION_1_3)
+	{
+		print_console(eeDebug, "Version 1.3 detected, converting to 1.2");
+		struct I2CFactoryConfigV3 *config3 = (struct I2CFactoryConfigV3*)buffer;
+		/* Set the mac 2 address block */
+		MacAddressBlock *mac = get_2nd_mac_address();
+		memcpy(mac->MacAddress, config3->MACADDR2, sizeof(MacAddressBlock));
+	}
+	
+	/* Go through all generic blocks and add them to the list */
+	int flashIndex = configSize + sizeof(u16);
+	while((EEPROM_SIZE_BYTES - flashIndex) > sizeof(GenericDataBlockHeader))
+	{
+		/* Allocate a generic block */
+		GenericDataBlock *block = malloc(sizeof(GenericDataBlock));
+		if(block == NULL)
+			return eeMallocError;
+
+		/* Read in the generic header */
+		status = i2c_read(EEPROM_ADDRESS, flashIndex, 1, (uchar*)&block->Header, 
+				sizeof(GenericDataBlockHeader));
+		flashIndex += sizeof(GenericDataBlockHeader);
+		if(status != 0)
+		{
+			free(block);
+			return eeI2CError;
+		}
+		 
+		/* Check if this a generic block by checking for the magic word */	
+		if(block->Header.MagicWord != CONFIG_I2C_MAGIC_WORD)
+		{
+			print_console(eeDebug, "No magic word for block, must be done");
+			free(block);
+			break;
+		}
+		else
+			print_console(eeDebug, "Found magic word for block(%04X), parsing", block->Header.Type);
+
+		/* Quick sanity check to see if data size is reasonable */
+		if(block->Header.Size > EEPROM_SIZE_BYTES)
+		{
+			print_console(eeInfo, "Generic block size(%04X) too large", block->Header.Size);
+			free(block);
+			return eeBadGenBlock;
+		}
+
+		/* malloc room for the data */	
+		block->Data = malloc(block->Header.Size);
+		if(block->Data == NULL)
+		{
+			free(block);
+			return eeMallocError;
+		}
+
+		/* Read in the data */
+		status = i2c_read(EEPROM_ADDRESS, flashIndex, 1, (uchar*)block->Data, block->Header.Size);
+		flashIndex += block->Header.Size;
+		if(status != 0)
+		{
+			free(block);
+			return eeI2CError;
+		}
+
+		/* Calculate the checksum */
+		u32 sumHeader = calc_checksum((uchar*)&block->Header, sizeof(GenericDataBlockHeader));
+		u32 sumData = calc_checksum((uchar*)block->Data, block->Header.Size);
+		u32 sumGen = sumHeader + sumData;
+		u32 readSumGen;
+
+		/* Grab generic block checksum */
+		status = i2c_read(EEPROM_ADDRESS, flashIndex, 1, (uchar*)&readSumGen, sizeof(u32));
+		flashIndex += sizeof(u32);
+		if(status != 0)
+		{
+			free(block->Data);
+			free(block);
+			return eeI2CError;
+		}
+
+		/* Check if checksum matches stored value */
+		if(readSumGen != sumGen)
+		{
+			print_console(eeDebug, "Block's checksum didn't match, Expected: %08X Actual: %08X", readSumGen, sumGen);
+			free(block->Data);
+			free(block);
+			return eeBadGenBlock;
+		}	
+
+		/* Check to make sure this is a known type */ 
+		if(is_known_generic_type(block->Header.Type) == 0)
+		{
+			print_console(eeInfo, "Unknown generic block(%04X), skipping", block->Header.Type);
+			free(block->Data);
+			free(block);
+			/* This type is unknown, skip it */
+			continue;
+		}
+
+		/* Add this block to our list */
+		print_console(eeDebug, "Found generic block(%04X), adding to list", block->Header.Type);
+		add_generic_block(block);
+	}
+
+	return eeSuccess;
+}
+
+void set_default_config(void)
+{
+	print_console(eeInfo, "Setting configuration to defaults");
+
+	/* Set default config */
+	memcpy(&factory_config_block, &default_factory_config, sizeof(struct I2CFactoryConfig));
+
+	/* Set default 2nd mac */
+	get_2nd_mac_address();
+}
+
+#define ERROR_I2C (-1)
+#define ERROR_BAD_CONFIG (1)
 /**
- *  return value: -1 i2c access error, 1 bad factory configuratio, 0 = OK
+ *  return value: -1 i2c access error, 1 bad factory configuration, 0 = OK
  */
 int get_factory_config_block(void)
 {
-	unsigned char* tmp;
-	int i;
-	u16 sum, CheckSum;
+	ParseStatus parseStatus;
+	int status = 0;
 
-	int fc_size = get_factory_config_size();
-	if(-1 != fc_size)
-		i = i2c_read(0x50, 0x00, 1, (unsigned char*)&factory_config_block, fc_size);
-	if (0 != i)
+
+	/* Parse in the config */
+	parseStatus = parse_factory_config();
+
+	switch(parseStatus)
 	{
-		printf("ERROR %d reading Factory Configuration Block\n", i);
-		return -1;
+		case eeUnknownConfig:
+		case eeNoMagicWord:
+		case eeBadChecksum:
+			print_console(eeError, "Factory Configuration Invalid");
+			print_console(eeInfo, "You must set the factory configuration to make permanent");
+			status = ERROR_BAD_CONFIG;
+			set_default_config();
+			break;
+		case eeI2CError:
+			print_console(eeError, "I2C error will reading Factory Configuration");
+			status = ERROR_I2C;
+			set_default_config();
+			break;
+		case eeMallocError:
+			print_console(eeError, "malloc Failed");
+			status = ERROR_BAD_CONFIG;
+			set_default_config();
+			break;
+		case eeBadGenBlock:
+			print_console(eeWarning, "Generic Configuration Block Invalid");
+			status = ERROR_BAD_CONFIG;
+			break;
+		case eeSuccess:
+			status = 0;
+			break;
 	}
 
-	i = i2c_read(0x50, fc_size, 1, (unsigned char*)&CheckSum, 2);
-	if (0 != i)
-	{
-		printf("ERROR %d reading Factory Configuration checksum\n", i);
-		return -1;
-	}
 
-	/* verify the configuration block is sane */
-	tmp = (unsigned char*)&factory_config_block;
-	sum = 0;
-	for (i = 0; i < sizeof(factory_config_block); i++)
-	{
-		sum += *tmp++;
-	}
-
-	if (sum != CheckSum)
-	{
-		puts("Error - Factory Configuration Invalid\n");
-		puts("You must set the factory configuration to make permanent\n");
-		memcpy(&factory_config_block, &default_factory_config, sizeof(factory_config_block));
-		return 1;
-	}
-	if(factory_config_block.ConfigVersion != CONFIG_I2C_VERSION)
-	{
-		printf("Factory config block version mismatch (read %08x vs %08x)\n",
-				factory_config_block.ConfigVersion , CONFIG_I2C_VERSION);
-		puts("You should [re]run factoryconfig set to update\n");
-	}
-	return 0;
+	return status;
 }
 
 /* This is a trivial atoi implementation since we don't have one available */
@@ -222,8 +605,6 @@ static int do_factoryconfig (cmd_tbl_t * cmdtp, int flag, int argc, char *argv[]
 	char *buffer = (char*)malloc(80 * sizeof(char));
 	char *strcopy = NULL;
 
-	printf("Factory config at %p [ %d bytes]\n",&factory_config_block,sizeof(factory_config_block));
-
 	if (argc == 1) {
 		/* List configuration info */
 		puts ("Factory Configuration:\n");
@@ -237,13 +618,14 @@ static int do_factoryconfig (cmd_tbl_t * cmdtp, int flag, int argc, char *argv[]
 				factory_config_block.MACADDR[3],
 				factory_config_block.MACADDR[4],
 				factory_config_block.MACADDR[5]);
+		MacAddressBlock *mac2 = get_2nd_mac_address();
 		printf("MAC Address2   : %02X:%02X:%02X:%02X:%02X:%02X\n",
-				factory_config_block.MACADDR2[0],
-				factory_config_block.MACADDR2[1],
-				factory_config_block.MACADDR2[2],
-				factory_config_block.MACADDR2[3],
-				factory_config_block.MACADDR2[4],
-				factory_config_block.MACADDR2[5]);
+				mac2->MacAddress[0],
+				mac2->MacAddress[1],
+				mac2->MacAddress[2],
+				mac2->MacAddress[3],
+				mac2->MacAddress[4],
+				mac2->MacAddress[5]);
 
 		printf("Serial Number  : %d\n",
 				factory_config_block.SerialNumber);
@@ -264,27 +646,28 @@ static int do_factoryconfig (cmd_tbl_t * cmdtp, int flag, int argc, char *argv[]
 				goto done;
 			set_mac_from_string(factory_config_block.MACADDR,buffer);
 
+			MacAddressBlock *mac2 = get_2nd_mac_address();
 			sprintf(buffer, "%02X:%02X:%02X:%02X:%02X:%02X",
-					factory_config_block.MACADDR2[0],
-					factory_config_block.MACADDR2[1],
-					factory_config_block.MACADDR2[2],
-					factory_config_block.MACADDR2[3],
-					factory_config_block.MACADDR2[4],
-					factory_config_block.MACADDR2[5]);
+					mac2->MacAddress[0],
+					mac2->MacAddress[1],
+					mac2->MacAddress[2],
+					mac2->MacAddress[3],
+					mac2->MacAddress[4],
+					mac2->MacAddress[5]);
 			readline_into_buffer ("MAC Address(2): ", buffer, 0);
 			if((strlen(buffer) == 1) && ('.' == buffer[0]))
 				goto done;                        
-			set_mac_from_string(factory_config_block.MACADDR2,buffer);
+			set_mac_from_string(mac2->MacAddress,buffer);
 
 			sprintf(buffer, "%d", factory_config_block.SerialNumber);
-			readline_into_buffer ("Serial Number :", buffer, 0);
+			readline_into_buffer ("Serial Number : ", buffer, 0);
 			if((strlen(buffer) == 1) && ('.' == buffer[0]))
 				goto done;
 			i = atoi(buffer);
 			if (i > 0) factory_config_block.SerialNumber = i;
 
 			sprintf(buffer, "%s", factory_config_block.ModelNumber);
-			readline_into_buffer ("Model Number  :", buffer, 0);
+			readline_into_buffer ("Model Number  : ", buffer, 0);
 			if((strlen(buffer) == 1) && ('.' == buffer[0]))
 				goto done;
 			buffer[31] = '\0';
@@ -293,10 +676,10 @@ static int do_factoryconfig (cmd_tbl_t * cmdtp, int flag, int argc, char *argv[]
 			factory_config_block.ModelNumber[31] = '\0';
 		} else if (0 == strncmp(argv[1],"save",4)) {
 			put_factory_config_block();
-			puts("Configuration Saved\n");
+			print_console(eeInfo, "Configuration Saved");
 		}
 		else {
-			puts("Unknown Option\n");
+			print_console(eeError, "Unknown Option");
 			goto done;
 		}
 	}
