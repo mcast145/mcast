@@ -469,8 +469,11 @@ void spl_board_init(void)
 	WATCHDOG_RESET();
 #endif
 	DEBUG_MEMORY
+
+#if (CONFIG_PRELOADER_EXE_ON_FPGA == 0) && (CONFIG_PRELOADER_RAMBOOT_PLLRESET == 1)
 	debug("RAM boot setup if CSEL 0\n");
 	ram_boot_setup();
+#endif
 
 	debug("Reconfigure Clock Manager\n");
 	/* reconfigure the PLLs */
@@ -694,17 +697,15 @@ void spl_board_init(void)
 		hang();
 #endif /* CONFIG_PRELOADER_HARDWARE_DIAGNOSTIC */
 
-#if (CONFIG_PRELOADER_SDRAM_SCRUBBING == 1)
-	/* scrub the boot region before copying happen */
-	sdram_scrub_boot_region();
-#if (CONFIG_PRELOADER_SDRAM_SCRUB_REMAIN_REGION == 1)
+#if (CONFIG_HPS_SDR_CTRLCFG_CTRLCFG_ECCEN == 1)
 	/*
-	 * Trigger DMA to scrub remain region so it can run parallel
-	 * with flash loading to minimize the scrubbing time penalty
+	 * Init the whole SDRAM ECC bit except the case when self refresh
+	 * is enabled and after a warm reset.
 	 */
-	sdram_scrub_remain_region_trigger();
-#endif /* CONFIG_PRELOADER_SDRAM_SCRUB_REMAIN_REGION */
-#endif /* CONFIG_PRELOADER_SDRAM_SCRUBBING */
+	if ((warmrst_preserve_sdram == 0) ||
+	   (rst_mgr_status & RSTMGR_COLDRST_MASK) != 0)
+		sdram_ecc_init();
+#endif
 
 #endif	/* CONFIG_PRELOADER_SKIP_SDRAM */
 
